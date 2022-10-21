@@ -1,4 +1,3 @@
-from ast import arg
 import socket
 import sys
 s = socket.socket()

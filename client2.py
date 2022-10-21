@@ -1,6 +1,3 @@
-from socket import socket
-
-
 import socket
 import sys
 s = socket.socket()

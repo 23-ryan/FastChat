@@ -1,51 +1,59 @@
-# Most imortant note:
-# DO CLOSE THE SOCKETS WHENEVER YOU OPEN THEM TO PREVENT RESOURCE LEAK!
-
-
-from email import message
 import socket
-s = socket.socket()
+import threading  # Libraries import
 
-port = 1234
-# this socket instance will bind to a client with any ip address, but the clients port must be the same as 'port'
-s.bind(('', port))
+host = '127.0.0.1'  # LocalHost
+port = 7976  # Choosing unreserved port
 
-s.listen(10)  # maximum number of allowed connections
-print(f"Listening on port {port}......")
+# socket initialization
+server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server.bind((host, port))  # binding host and port to socket
+server.listen()
 
-# this list stores clients in the chronological order of their connection to the server
 clients = []
-
-# this loop makes the program wait till the socket instance s connects to two clients
-while True:
-    c, adrr = s.accept()
-    clients.append(c)
-    if (len(clients) == 2):
-        break
-
-# A is the client that connects first and B is the one who connects next
-# the messages sent by A and B in chronological order
-messageA = []
-messageB = []
+nicknames = []
 
 
-# following loop works properly only when the two clients send messages alternately. If either one sends a message out of his/her turn, the message will be stored in the list and sent eventually.
-num = 0  # represents which client's turn it is to talk. 0 means A should be talking
-while len(clients) != 0:
-    if (num == 0):
-        if (len(messageB) == 0):
-            clients[0].send("==> No message yet <==".encode())
+def kick(client):
+    client.send('YOU ARE BEING KICKED'.encode('utf-8'))
+    index = clients.index(client)
+    clients.remove(client)
+    client.close()
+    nickname = nicknames[index]
+    broadcast('{} left!'.format(nickname).encode('utf-8'))
+    nicknames.remove(nickname)
+
+
+def broadcast(message):  # broadcast function declaration
+    for client in clients:
+        client.send(message)
+
+
+def handle(client):
+    while True:
+        # try:  # recieving valid messages from client
+        index = clients.index(client)
+        message = client.recv(1024)
+        # if the client types 'LEAVE GROUP' as his/her message
+        if message.decode('utf-8') == '{}: LEAVE GROUP'.format(nicknames[index]):
+            kick(client)
+            break
         else:
-            clients[0].send(messageB[-1].encode())
-        # recv is a blocking method. Therefore any messages sent by B in this timeframe will be stored in the list but not printed on A's terminal
-        messageA.append(f"A:{clients[0].recv(1024).decode('utf-8')}")
-        num = 1
-    elif (num == 1):
-        clients[1].send(messageA[-1].encode())
-        # recv is a blocking method. Therefore any messages sent by A in this timeframe will be stored in the list but not printed on B's terminal
-        messageB.append(f"B:{clients[1].recv(1024).decode('utf-8')}")
-        num = 0
+            broadcast(message)
 
 
-# HAVE TO FIX THIS (server socket must close.)
-s.close()
+def receive():  # accepting multiple clients
+    while True:
+        client, address = server.accept()
+        print("Connected with {}".format(str(address)))
+        client.send('NICKNAME'.encode('utf-8'))
+        nickname = client.recv(1024).decode('utf-8')
+        nicknames.append(nickname)
+        clients.append(client)
+        print("Nickname is {}".format(nickname))
+        broadcast("{} joined!".format(nickname).encode('utf-8'))
+        client.send('Connected to server!'.encode('utf-8'))
+        thread = threading.Thread(target=handle, args=(client,))
+        thread.start()
+
+
+receive()

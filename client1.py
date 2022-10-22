@@ -1,12 +1,15 @@
 import socket
-import sys
 s = socket.socket()
 
-port = 2234
-s.connect(('127.0.0.12', port))
+port = 1234
+s.connect(('localhost', port))
 mess = ""
-for i in range(1,len(sys.argv)):
-    mess+=sys.argv[i]+" "
-s.send(f"{mess}".encode())
-print(s.recv(1024).decode('utf-8'))
+
+incomMess = s.recv(1024)
+while incomMess!="quit":
+    print(incomMess.decode())
+    a = input()
+    s.send(a.encode())
+    incomMess = s.recv(1024)
+
 s.close()

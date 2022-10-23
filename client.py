@@ -21,7 +21,7 @@ while True:
     message = input(f'{my_username} > ')
     if message == "LEAVE GROUP":
         message = message.encode('utf-8')
-        message_header = f"{len(message):<{HEADER_LENGTH}}".encode('utf-8')
+        message_header = f"{len(message):<{HEADER_LENGTH}}".encode('utf-8') # It is a string with length="HEADER_LENGTH" and with the number "len(message) alligned to its left"
         client_socket.send(message_header + message)
         print("You are no longer a participant of this group")
         sys.exit()

@@ -1,6 +1,9 @@
+import os
 import socket
 import select
 import json
+
+from json.decoder import JSONDecodeError
 
 HEADER_LENGTH = 10
 
@@ -21,8 +24,10 @@ print(f'Listening for connections on {IP}:{PORT}...')
 
 def receive_message(client_socket):
     try:
-        userData = client_socket.recv(1024)
+        userData = client_socket.recv(1048576)
+        print(userData.decode('utf-8'))
         userData = json.loads(userData.decode('utf-8'))
+        print(userData)
 
         if not len(userData):
             return False
@@ -32,9 +37,16 @@ def receive_message(client_socket):
         if(message_length != len(message)):
             print("Complete message not recieved!")
         
+        if(message == "SEND IMAGE"):
+            # print("Hello")
+            image = userData['imageData']
+            return {'imageData': f"{image}", 'imageFormat':userData['imageFormat'], 'Len':userData['userHeader'], 'Message':message}
+
         return {'Len':userData['userHeader'], 'Message':message}
-    except:
+    except JSONDecodeError as e:
+        print(e)
         # Something went wrong like empty message or client exited abruptly.
+        print("hello")
         return False
 
 while True:
@@ -60,7 +72,7 @@ while True:
                     del clients[iter_socket] # removes that particular socket from the clients dictionary
                     
                     continue
-                
+
                 # if message typed is exactly LEAVE GROUP the remove that client.(for which message should be true)
                 if message:
                     if message['Message'] == "LEAVE GROUP":
@@ -79,6 +91,11 @@ while True:
                 for client_socket in clients:
                     # But don't sent it to sender
                     if client_socket != iter_socket:
+
+                        if(message['Message'] == "SEND IMAGE"):
+                            jsonData = json.dumps({"imageFormat":f"{message['imageFormat']}", "imageData":f"{message['imageData']}", "usernameLen":f"{user['Len'].strip()}" , "userName":f"{user['Message']}" , 'messageLen':f"{message['Len'].strip()}" , 'message':f"{message['Message']}"})
+                            client_socket.send(bytes(jsonData, encoding='utf-8'))
+                            continue
                         # Send user and message (both with their headers)
                         # We are reusing here message header sent by sender, and saved username header send by user when he connected
                         jsonData = json.dumps({"usernameLen":f"{user['Len'].strip()}" , "userName":f"{user['Message']}" , 'messageLen':f"{message['Len'].strip()}" , 'message':f"{message['Message']}"})

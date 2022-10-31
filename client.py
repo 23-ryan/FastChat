@@ -1,8 +1,10 @@
+import os
 import socket
 import select
 import errno
 import sys
 import json
+import base64
 
 HEADER_LENGTH = 10
 
@@ -28,7 +30,7 @@ while True:
         for sockets in read_sockets:
             # LEAVE GROUP message
             if(client_socket == sockets):
-                data = client_socket.recv(1024)
+                data = client_socket.recv(1048576)
                 data = json.loads(data.decode('utf-8'))
                 # If we received no data, server gracefully closed a connection, for example using socket.close() or socket.shutdown(socket.SHUT_RDWR)
                 if not len(data):
@@ -41,6 +43,14 @@ while True:
 
                 message_length = int(data['messageLen'])
                 message = data['message']
+
+                if message == "SEND IMAGE":
+                    ans = input("DO YOU WANT TO RECIEVE AN IMAGE SENT(YES/NO ?):")
+                    if(ans.upper() == "YES"):
+                        os.system(f'touch image.{data["imageFormat"]}')
+                        with open(f'image.{data["imageFormat"]}', 'wb') as f:
+                            f.write(base64.b64decode(data["imageData"]))
+
                 print(f'{username} > {message}')
 
             else:
@@ -51,7 +61,19 @@ while True:
                     client_socket.send(message_header + message)
                     print("You are no longer a participant of this group")
                     sys.exit()
-                if message:
+
+                elif message == "SEND IMAGE":
+                    path = input("PATH OF IMAGE: ")
+                    img_json = ""
+                    if(path != ""):
+                        with open(path, 'rb') as f:
+                            img_json = {'userHeader':f"{len(message):<{HEADER_LENGTH}}", 'userMessage':f"{message}", 'imageFormat': f"{path.split('.')[-1]}", 'imageData':f"{base64.encodebytes(f.read()).decode('utf-8')}"}
+                        
+                        jsonData = json.dumps(img_json)
+                        client_socket.send(bytes(jsonData, encoding='utf-8'))
+        
+
+                elif message:
                     # Encode message to bytes, prepare header and convert to bytes, like for username above, then send
                     message_header = f"{len(message):<{HEADER_LENGTH}}"
                     jsonData = json.dumps({'userHeader':f"{message_header}", 'userMessage':f"{message}"})
@@ -64,12 +86,12 @@ while True:
         # We are going to check for both - if one of them - that's expected, means no incoming data, continue as normal
         # If we got different error code - something happened
         if e.errno != errno.EAGAIN and e.errno != errno.EWOULDBLOCK:
-            print('Reading error: {}'.format(str(e)))
+            print('Reading error2: {}'.format(str(e)))
             sys.exit()
         # We just did not receive anything
         continue
 
     except Exception as e:
         # Any other exception - something happened, exit
-        print('Reading error: {}'.format(str(e)))
+        print('Reading error1: {}'.format(str(e)))
         sys.exit()

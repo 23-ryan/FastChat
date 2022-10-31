@@ -17,13 +17,11 @@ username = my_username.encode('utf-8')
 username_header = f"{len(username):<{HEADER_LENGTH}}".encode('utf-8')
 client_socket.send(username_header + username)
 
+sockets_list = [sys.stdin, client_socket]
 while True:
 
     try:
         while True:
-
-            sockets_list = [sys.stdin, client_socket]
- 
             """ There are two possible input situations. Either the
             user wants to give manual input to send to other people,
             or the server is sending a message to be printed on the

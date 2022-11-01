@@ -1,4 +1,6 @@
+from base64 import decode
 import os
+import sys
 import socket
 import select
 import json
@@ -7,7 +9,7 @@ from json.decoder import JSONDecodeError
 
 HEADER_LENGTH = 10
 
-IP = "127.0.0.1"
+IP = "localhost"
 PORT = 3000
 
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -24,30 +26,31 @@ print(f'Listening for connections on {IP}:{PORT}...')
 
 def receive_message(client_socket):
     try:
-        userData = client_socket.recv(1048576)
-        print(userData.decode('utf-8'))
-        userData = json.loads(userData.decode('utf-8'))
-        print(userData)
+        userData = ''
+        new_message = True
+        while True:
+            temp = client_socket.recv(16).decode('utf-8')
+            if(new_message):
+                message_len = int(temp[:HEADER_LENGTH].strip())
+                userData += temp[HEADER_LENGTH:]
+                new_message = False
+                continue
+            
+            userData += temp
+            # print("USER: ",userData)
+            if(message_len == len(userData)):
+                userData = json.loads(userData)
+                return userData
 
-        if not len(userData):
-            return False
 
-        message_length = int(userData['userHeader'].strip())
-        message = userData['userMessage']
-        if(message_length != len(message)):
-            print("Complete message not recieved!")
-        
-        if(message == "SEND IMAGE"):
-            # print("Hello")
-            image = userData['imageData']
-            return {'imageData': f"{image}", 'imageFormat':userData['imageFormat'], 'Len':userData['userHeader'], 'Message':message}
-
-        return {'Len':userData['userHeader'], 'Message':message}
+        # return {'Len':userData['userHeader'], 'Message':message}
     except JSONDecodeError as e:
         print(e)
         # Something went wrong like empty message or client exited abruptly.
-        print("hello")
         return False
+
+
+
 
 while True:
     # Of these three lists, returned by the selet method, 1st is the one which has all sockets whcih are ready to proceed.
@@ -62,7 +65,7 @@ while True:
                     continue
                 sockets_list.append(client_socket)
                 clients[client_socket] = user
-                print('Accepted new connection from {}:{}, username: {}'.format(*client_address, user['Message']))
+                print('Accepted new connection from {}:{}, username: {}'.format(*client_address, user['userMessage']))
 
             else:
                 message = receive_message(iter_socket)
@@ -75,10 +78,10 @@ while True:
 
                 # if message typed is exactly LEAVE GROUP the remove that client.(for which message should be true)
                 if message:
-                    if message['Message'] == "LEAVE GROUP":
+                    if message['userMessage'] == "LEAVE GROUP":
                         print('Closed connection from: {}'.format(clients[iter_socket]))
                         sockets_list.remove(iter_socket)
-                        if message['Message'] == "LEAVE GROUP":
+                        if message['userMessage'] == "LEAVE GROUP":
                             iter_socket.send("LEAVE".encode())
                         del clients[iter_socket]
 
@@ -86,20 +89,24 @@ while True:
 
 
                 user = clients[iter_socket]
-                print(f"Received message from {user['Message']}: {message['Message']}")
+                print(f"Received message from {user['userMessage']}: {message['userMessage']}")
 
                 for client_socket in clients:
                     # But don't sent it to sender
                     if client_socket != iter_socket:
 
-                        if(message['Message'] == "SEND IMAGE"):
-                            jsonData = json.dumps({"imageFormat":f"{message['imageFormat']}", "imageData":f"{message['imageData']}", "usernameLen":f"{user['Len'].strip()}" , "userName":f"{user['Message']}" , 'messageLen':f"{message['Len'].strip()}" , 'message':f"{message['Message']}"})
-                            client_socket.send(bytes(jsonData, encoding='utf-8'))
+                        if(message['userMessage'] == "SEND IMAGE"):
+                            message['userName'] = user['userMessage']
+                            jsonData = json.dumps(message)
+                            client_socket.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
+                            print("sent from server")
                             continue
                         # Send user and message (both with their headers)
                         # We are reusing here message header sent by sender, and saved username header send by user when he connected
-                        jsonData = json.dumps({"usernameLen":f"{user['Len'].strip()}" , "userName":f"{user['Message']}" , 'messageLen':f"{message['Len'].strip()}" , 'message':f"{message['Message']}"})
-                        client_socket.send(bytes(jsonData, encoding='utf-8'))
+
+                        message['userName'] = user['userMessage']
+                        jsonData = json.dumps(message)
+                        client_socket.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
                     
 
     # It's not really necessary to have this, but will handle some socket exceptions just in case

@@ -8,7 +8,7 @@ import base64
 
 HEADER_LENGTH = 10
 
-IP = "127.0.0.1"
+IP = "192.168.0.106"
 PORT = 3000
 my_username = input("Username: ")
 
@@ -30,7 +30,7 @@ while True:
         for sockets in read_sockets:
             # LEAVE GROUP message
             if(client_socket == sockets):
-                data = client_socket.recv(1048576)
+                data = client_socket.recv(4196540)
                 data = json.loads(data.decode('utf-8'))
                 # If we received no data, server gracefully closed a connection, for example using socket.close() or socket.shutdown(socket.SHUT_RDWR)
                 if not len(data):

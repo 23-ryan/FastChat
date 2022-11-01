@@ -5,10 +5,11 @@ import errno
 import sys
 import json
 import base64
+from json.decoder import JSONDecodeError
 
 HEADER_LENGTH = 10
 
-IP = "192.168.0.106"
+IP = "localhost"
 PORT = 3000
 my_username = input("Username: ")
 
@@ -20,9 +21,41 @@ username = my_username
 username_header = f"{len(username):<{HEADER_LENGTH}}"
 data = {'userHeader':f"{username_header}", 'userMessage':f"{username}"}
 jsonData = json.dumps(data)
-client_socket.send(bytes(jsonData, encoding='utf-8'))
+print(f'{len(jsonData):<10}')
+client_socket.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
 
 sockets_list = [sys.stdin, client_socket]
+
+def receive_message(client_socket):
+    try:
+        userData = ''
+        new_message = True
+        while True:
+            temp = client_socket.recv(16).decode('utf-8')
+            if(new_message):
+                message_len = int(temp[:HEADER_LENGTH].strip())
+                # print(message_len)
+                userData += temp[HEADER_LENGTH:]
+                new_message = False
+                continue
+            
+            userData += temp
+            # print(len(userData))
+            # print(userData)
+            # print("USER: ",userData)
+            if(message_len == len(userData)):
+                userData = json.loads(userData)
+                return userData
+
+
+        # return {'Len':userData['userHeader'], 'Message':message}
+    except JSONDecodeError as e:
+        print(e)
+        # Something went wrong like empty message or client exited abruptly.
+        return False
+
+
+
 
 while True:
     try:
@@ -30,35 +63,33 @@ while True:
         for sockets in read_sockets:
             # LEAVE GROUP message
             if(client_socket == sockets):
-                data = client_socket.recv(4196540)
-                data = json.loads(data.decode('utf-8'))
+                data = receive_message(sockets)
                 # If we received no data, server gracefully closed a connection, for example using socket.close() or socket.shutdown(socket.SHUT_RDWR)
-                if not len(data):
+                if not data:
                     print('Connection closed by the server')
                     sys.exit()
                 
-                # print(data)
-                username_length = int(data['usernameLen'])
                 username = data['userName']
-
-                message_length = int(data['messageLen'])
-                message = data['message']
+                message = data['userMessage']
 
                 if message == "SEND IMAGE":
+                    print(data)
                     ans = input("DO YOU WANT TO RECIEVE AN IMAGE SENT(YES/NO ?):")
                     if(ans.upper() == "YES"):
-                        os.system(f'touch image.{data["imageFormat"]}')
-                        with open(f'image.{data["imageFormat"]}', 'wb') as f:
+                        name = input("NAME OF IMAGE: ")
+                        os.system(f'touch {name}.{data["imageFormat"]}')
+                        with open(f'{name}.{data["imageFormat"]}', 'wb') as f:
                             f.write(base64.b64decode(data["imageData"]))
+                            print('recieved Image')
+                    continue
 
                 print(f'{username} > {message}')
 
             else:
                 message = sys.stdin.readline()[0:-1]
                 if message == "LEAVE GROUP":
-                    message = message.encode('utf-8')
-                    message_header = f"{len(message):<{HEADER_LENGTH}}".encode('utf-8') # It is a string with length="HEADER_LENGTH" and with the number "len(message) alligned to its left"
-                    client_socket.send(message_header + message)
+                    jsonData = json.dumps({'userMessage':f"{message}"})
+                    client_socket.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
                     print("You are no longer a participant of this group")
                     sys.exit()
 
@@ -67,17 +98,16 @@ while True:
                     img_json = ""
                     if(path != ""):
                         with open(path, 'rb') as f:
-                            img_json = {'userHeader':f"{len(message):<{HEADER_LENGTH}}", 'userMessage':f"{message}", 'imageFormat': f"{path.split('.')[-1]}", 'imageData':f"{base64.encodebytes(f.read()).decode('utf-8')}"}
-                        
+                            img_json = {'userMessage':f"{message}", 'imageFormat': f"{path.split('.')[-1]}", 'imageData':f"{base64.encodebytes(f.read()).decode('utf-8')}"}
+                            print("Image sent")
                         jsonData = json.dumps(img_json)
-                        client_socket.send(bytes(jsonData, encoding='utf-8'))
+                        client_socket.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
         
 
                 elif message:
                     # Encode message to bytes, prepare header and convert to bytes, like for username above, then send
-                    message_header = f"{len(message):<{HEADER_LENGTH}}"
-                    jsonData = json.dumps({'userHeader':f"{message_header}", 'userMessage':f"{message}"})
-                    client_socket.send(bytes(jsonData, encoding='utf-8'))
+                    jsonData = json.dumps({'userMessage':f"{message}"})
+                    client_socket.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
 
             
     except IOError as e:

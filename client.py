@@ -4,7 +4,7 @@ nickname = input("Choose your nickname: ")
 
 # socket initialization
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client.connect(('127.0.0.1', 7976))  # connecting client to server
+client.connect(('127.0.0.1', 4000))  # connecting client to server
 
 
 def receive():
@@ -32,8 +32,11 @@ def write():
         client.send(message.encode('utf-8'))
 
 
-receive_thread = threading.Thread(
-    target=receive)  # receiving multiple messages
+receive_thread = threading.Thread(target=receive)  # receiving multiple messages
 receive_thread.start()
+
 write_thread = threading.Thread(target=write)  # sending messages
 write_thread.start()
+
+
+

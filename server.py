@@ -1,8 +1,10 @@
 import socket
+import this
 import threading  # Libraries import
 
+
 host = '127.0.0.1'  # LocalHost
-port = 7976  # Choosing unreserved port
+port = 4000  # Choosing unreserved port
 
 # socket initialization
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -13,11 +15,13 @@ clients = []
 nicknames = []
 
 
+
 def kick(client):
     client.send('YOU ARE BEING KICKED'.encode('utf-8'))
     index = clients.index(client)
     clients.remove(client)
-    client.close()
+    print(clients)
+    del client
     nickname = nicknames[index]
     broadcast('{} left!'.format(nickname).encode('utf-8'))
     nicknames.remove(nickname)
@@ -30,16 +34,19 @@ def broadcast(message):  # broadcast function declaration
 
 def handle(client):
     while True:
-        # try:  # recieving valid messages from client
         index = clients.index(client)
         message = client.recv(1024)
-        # if the client types 'LEAVE GROUP' as his/her message
-        if message.decode('utf-8') == '{}: LEAVE GROUP'.format(nicknames[index]):
-            kick(client)
-            break
-        else:
-            broadcast(message)
 
+        # if the client types 'LEAVE GROUP' as his/her message
+        # Used a try and except block that tries to provide some time for the current thread to sync with other thread changes
+        try:
+            if message.decode('utf-8') == '{}: LEAVE GROUP'.format(nicknames[index]):
+                kick(client)
+                break
+            else:
+                broadcast(message)
+        except:
+            continue
 
 def receive():  # accepting multiple clients
     while True:

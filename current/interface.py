@@ -2,6 +2,12 @@
 from signIn import handleSignIn
 from signUp import handleSignUp
 from termcolor import colored
+import xmlrpc.client as cl
+import sys
+
+IP = sys.argv[1]
+PORT = int(sys.argv[2])
+proxy = cl.ServerProxy(f"http://{IP}:{PORT}/")
 
 
 # Chat name
@@ -16,9 +22,9 @@ print('2.', colored("SIGN UP", 'blue'))
 choice = input("\nType your choice: ")
 
 if(choice == '1'):
-    handleSignIn()
+    handleSignIn(proxy)
 elif(choice == '2'):
-    handleSignUp()
+    handleSignUp(proxy)
 
 
 print(colored("USER OPTIONS", 'orange'))

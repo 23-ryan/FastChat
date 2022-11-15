@@ -41,12 +41,6 @@ def addNewUser(userName,password, publicKey):
                 VALUES("{userName}", "{password}", {publicKey['n']}, {publicKey['e']});'''
     cur.execute(query)
 
-# 
-# 
-# 
-# 
-def handleClientQueries(funcName):
-    
 
 def receive_message(client_socket):
     try:
@@ -94,9 +88,11 @@ if __name__ == '__main__':
     print(f'Listening for connections on {IP}:{PORT}...')
 
     # NEW XMLRPC SERVER
-    server = MyServer(('192.168.0.106', PORT), logRequests=False)
-    server.register_function()
-    server.serve_forever()
+    rpcServer = MyServer((IP, PORT), logRequests=False)
+    rpcServer.register_function(isValidPassword)
+    rpcServer.register_function(addNewUser)
+    rpcServer.register_function(checkUserName)
+    rpcServer.serve_forever()
 
     while True:
         # Of these three lists, returned by the selet method, 1st is the one which has all sockets whcih are ready to proceed.

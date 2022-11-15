@@ -1,21 +1,19 @@
 import rsa
-from server import addNewUser
-from server import checkUserName
 from termcolor import colored
 
-def handleSignUp():
+def handleSignUp(proxy):
     userName = input("User Name: ")
-    if (not checkUserName(userName)):
+    if (not proxy.checkUserName(userName)):
         password = input("Password: ")
 
         publickey, privatekey = rsa.newkeys(48)
-        addNewUser(userName, password, publickey)
+        proxy.addNewUser(userName, password, publickey)
         print(colored('USER SUCCESSFULLY REGISTERED !!', 'yellow'))
 
         # CREATE CONNECTIONS TABLE
-        
+        query = f'''CREATE DATABASE '''
         return
 
     else:
         print("INVALID USERNAME! ")
-        handleSignUp()
+        handleSignUp(proxy)

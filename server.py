@@ -26,7 +26,6 @@ def  getPublicKey(username):
     record = cur.fetchall()[0]
     print(record)
     return record
-    # return (password == recordPassword)
     
 
 def isValidPassword(userName, password):

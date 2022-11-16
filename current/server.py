@@ -22,24 +22,34 @@ class MyServer(Server.SimpleXMLRPCServer):
 
 def isValidPassword(userName, password):
     cur = connectToDb()
-    query = f'''SELECT password FROM userinfo WHERE username="{userName}";'''
+    query = f'''SELECT password FROM userinfo WHERE username='{userName}';'''
     cur.execute(query)
     recordPassword = cur.fetchall()[0][0]
     return (password == recordPassword)
 
 def checkUserName(userName):
+    print("hehe")
     cur = connectToDb()
+    print("hi")
     query = f'''SELECT username FROM userinfo;'''
     cur.execute(query)
+    print("hoho")
     record = cur.fetchall()
+    print(record)
     return (f"{userName}",) in record
 
 
-def addNewUser(userName,password, publicKey):
+def addNewUser(userName,password, n, e):
     cur = connectToDb()
+    print("hi")
     query = f'''INSERT INTO userinfo
-                VALUES("{userName}", "{password}", {publicKey['n']}, {publicKey['e']});'''
+                VALUES ('{userName}', '{password}', {int(n)}, {int(e)});'''
+    print("hehe")
+    print(userName)
     cur.execute(query)
+    cur.execute("SELECT * FROM userinfo")
+    print(cur.fetchall())
+    print("ksndksnd")
 
 
 def receive_message(client_socket):
@@ -88,7 +98,7 @@ if __name__ == '__main__':
     print(f'Listening for connections on {IP}:{PORT}...')
 
     # NEW XMLRPC SERVER
-    rpcServer = MyServer((IP, PORT), logRequests=False)
+    rpcServer = MyServer((IP, 3000), logRequests=False,allow_none=True)
     rpcServer.register_function(isValidPassword)
     rpcServer.register_function(addNewUser)
     rpcServer.register_function(checkUserName)

@@ -31,10 +31,10 @@ def  getPublicKey(username):
 
 def isValidPassword(userName, password):
     cur = connectToDb()
-    query = f'''SELECT password FROM userinfo WHERE username='{userName}';'''
+    query = f'''SELECT password = crypt('{password}', password) FROM userinfo WHERE username='{userName}';'''
     cur.execute(query)
-    recordPassword = cur.fetchall()[0][0]
-    return (password == recordPassword)
+    recordPassword = cur.fetchall()
+    return recordPassword[0][0]
 
 def checkUserName(userName):
     print("hehe")
@@ -51,8 +51,11 @@ def checkUserName(userName):
 def addNewUser(userName,password, n, e):
     cur = connectToDb()
     print("hi")
+    # --------------------------
+    # CREATE EXTENSION pgcrypto;
+    # --------------------------
     query = f'''INSERT INTO userinfo
-                VALUES ('{userName}', '{password}', {int(n)}, {int(e)});'''
+                VALUES ('{userName}', crypt('{password}', gen_salt('bf', 8)), {int(n)}, {int(e)});'''
     print("hehe")
     print(userName)
     cur.execute(query)
@@ -60,7 +63,7 @@ def addNewUser(userName,password, n, e):
     print(cur.fetchall())
     print("ksndksnd")
 
-def receive_message(client_socket):
+def unpack_message(client_socket):
     try:
         userData = ''
         new_message = True
@@ -86,6 +89,10 @@ def receive_message(client_socket):
         # Something went wrong like empty message or client exited abruptly.
         return False
 
+# extracts the scket corresponding to a particular username
+def getSocket(reciever, clients):
+    return list(clients.keys())[list(clients.values()).index(reciever)]
+
 
 if __name__ == '__main__':
 
@@ -106,12 +113,13 @@ if __name__ == '__main__':
     print(f'Listening for connections on {IP}:{PORT}...')
 
     # NEW XMLRPC SERVER
-    rpcServer = MyServer((IP, 3000), logRequests=False,allow_none=True)
+    rpcServer = MyServer((IP, 3000), logRequests=False, allow_none=True)
     rpcServer.register_function(isValidPassword)
     rpcServer.register_function(addNewUser)
     rpcServer.register_function(checkUserName)
     rpcServer.register_function(getPublicKey)
-    rpcServer.serve_forever()
+    # rpcServer.serve_forever()
+    rpcServer.server_activate()
 
     while True:
         # Of these three lists, returned by the selet method, 1st is the one which has all sockets whcih are ready to proceed.
@@ -121,7 +129,7 @@ if __name__ == '__main__':
         for iter_socket in read_sockets:
                 if iter_socket == server_socket:
                     client_socket, client_address = server_socket.accept()
-                    user = receive_message(client_socket)
+                    user = unpack_message(client_socket)
                     if not user:
                         continue
                     sockets_list.append(client_socket)
@@ -129,7 +137,7 @@ if __name__ == '__main__':
                     print('Accepted new connection from {}:{}, username: {}'.format(*client_address, user['userMessage']))
 
                 else:
-                    message = receive_message(iter_socket)
+                    message = unpack_message(iter_socket)
                     if not message:
                         print('Closed connection from: {}'.format(clients[iter_socket]))
                         sockets_list.remove(iter_socket)
@@ -151,28 +159,37 @@ if __name__ == '__main__':
 
                     user = clients[iter_socket]
                     print(f"Received message from {user['userMessage']}: {message['userMessage']}")
+                    if(not message['isGroup']):
+                        # message['userName'] = user['userMessage'] # sender name
+                        jsonData = json.dumps(message)
+                        sock = getSocket(message['reciever'], clients)
+                        sock.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
 
-                    for client_socket in clients:
-                        # But don't sent it to sender
-                        if client_socket != iter_socket:
 
-                            if(message['userMessage'] == "SEND IMAGE"):
-                                message['userName'] = user['userMessage']
+                
+                    elif(message['isGroup']):
+                        for client_socket in clients:
+                            # But don't sent it to sender
+                            if client_socket != iter_socket:
+
+                                if(message['userMessage'] == "SEND IMAGE"):
+                                    # message['userName'] = user['userMessage']
+                                    jsonData = json.dumps(message)
+                                    client_socket.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
+                                    print("sent from server")
+                                    continue
+                                # Send user and message (both with their headers)
+                                # We are reusing here message header sent by sender, and saved username header send by user when he connected
+
+                                # message['userName'] = user['userMessage']
                                 jsonData = json.dumps(message)
                                 client_socket.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
-                                print("sent from server")
-                                continue
-                            # Send user and message (both with their headers)
-                            # We are reusing here message header sent by sender, and saved username header send by user when he connected
-
-                            message['userName'] = user['userMessage']
-                            jsonData = json.dumps(message)
-                            client_socket.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
                         
 
         # It's not really necessary to have this, but will handle some socket exceptions just in case
+        print(exception_sockets)
         for notified_socket in exception_sockets:
-
+            # print(notified_socket)
             # Remove from list for socket.socket()
             sockets_list.remove(notified_socket)
 

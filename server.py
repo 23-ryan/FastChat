@@ -1,4 +1,9 @@
 # "" are used to make table names case insensitive
+#################################
+# IMPLEMENT TRY-EXCEPT BLOCKS !!!
+# for deletions of socket
+# keyboard interruptions
+#################################
 
 from base64 import decode
 import socket
@@ -10,14 +15,8 @@ from termcolor import colored
 from serverDatabase import connectToDb
 from json.decoder import JSONDecodeError
 
-import xmlrpc.server as Server
-
-class MyServer(Server.SimpleXMLRPCServer):
-
-    def serve_forever(self):
-        self.quit = 0
-        while not self.quit:
-            self.handle_request()
+import xmlrpc.server as SimpleThreadedXMLRPCServer
+import threading
 
 def  getPublicKey(username):
     cur = connectToDb()
@@ -37,31 +36,22 @@ def isValidPassword(userName, password):
     return recordPassword[0][0]
 
 def checkUserName(userName):
-    print("hehe")
     cur = connectToDb()
-    print("hi")
     query = f'''SELECT username FROM userinfo;'''
     cur.execute(query)
-    print("hoho")
     record = cur.fetchall()
-    print(record)
     return (f"{userName}",) in record
 
 
 def addNewUser(userName,password, n, e):
     cur = connectToDb()
-    print("hi")
     # --------------------------
     # CREATE EXTENSION pgcrypto;
     # --------------------------
     query = f'''INSERT INTO userinfo
                 VALUES ('{userName}', crypt('{password}', gen_salt('bf', 8)), {int(n)}, {int(e)});'''
-    print("hehe")
-    print(userName)
     cur.execute(query)
     cur.execute("SELECT * FROM userinfo")
-    print(cur.fetchall())
-    print("ksndksnd")
 
 def unpack_message(client_socket):
     try:
@@ -69,6 +59,9 @@ def unpack_message(client_socket):
         new_message = True
         while True:
             temp = client_socket.recv(16).decode('utf-8')
+            if temp=='':
+                return False
+            print("TEMP", temp)
             if(new_message):
                 print(temp)
                 message_len = int(temp[:HEADER_LENGTH].strip())
@@ -91,6 +84,8 @@ def unpack_message(client_socket):
 
 # extracts the scket corresponding to a particular username
 def getSocket(reciever, clients):
+    print("-------------", clients.keys())
+    print("-----------", clients.values())
     return list(clients.keys())[list(clients.values()).index(reciever)]
 
 
@@ -113,18 +108,40 @@ if __name__ == '__main__':
     print(f'Listening for connections on {IP}:{PORT}...')
 
     # NEW XMLRPC SERVER
-    rpcServer = MyServer((IP, 3000), logRequests=False, allow_none=True)
-    rpcServer.register_function(isValidPassword)
-    rpcServer.register_function(addNewUser)
-    rpcServer.register_function(checkUserName)
-    rpcServer.register_function(getPublicKey)
-    # rpcServer.serve_forever()
-    rpcServer.server_activate()
+    # rpcServer = SimpleXMLRPCServer.SimpleXMLRPCServer((IP, 3000), logRequests=False,allow_none=True)
+    # # rpcServer.register_instance(ServerTrial())
+    # rpcServer.register_function(isValidPassword)
+    # rpcServer.register_function(addNewUser)
+    # rpcServer.register_function(checkUserName)
+    # rpcServer.register_function(getPublicKey)
+    # print("hello")
+    # server_thread = threading.Thread(target = rpcServer.serve_forever())
+    # server_thread.start()
+    # print("skdhks")
+
+
+    class ServerThread(threading.Thread):
+        def __init__(self):
+            threading.Thread.__init__(self)
+            self.server = SimpleThreadedXMLRPCServer.SimpleXMLRPCServer((IP,3000),logRequests=False,allow_none=True)
+            self.server.register_function(isValidPassword) #just return a string
+            self.server.register_function(addNewUser)
+            self.server.register_function(checkUserName)
+            self.server.register_function(getPublicKey)
+
+        def run(self):
+            self.server.serve_forever()
+
+    server = ServerThread()
+    server.start()  
+    print("hi")
 
     while True:
         # Of these three lists, returned by the selet method, 1st is the one which has all sockets whcih are ready to proceed.
         # 3rd is the one which throws some exception
         read_sockets, _, exception_sockets = select.select(sockets_list, [], sockets_list)
+        # print(sockets_list)
+        print(clients)
 
         for iter_socket in read_sockets:
                 if iter_socket == server_socket:
@@ -133,7 +150,8 @@ if __name__ == '__main__':
                     if not user:
                         continue
                     sockets_list.append(client_socket)
-                    clients[client_socket] = user
+                    clients[client_socket] = user['userMessage']
+                    print(user, "USERUSERUSERUSERUSERUSER")
                     print('Accepted new connection from {}:{}, username: {}'.format(*client_address, user['userMessage']))
 
                 else:
@@ -158,15 +176,14 @@ if __name__ == '__main__':
 
 
                     user = clients[iter_socket]
-                    print(f"Received message from {user['userMessage']}: {message['userMessage']}")
+                    print(f"Received message from {user}: {message['userMessage']}")
                     if(not message['isGroup']):
                         # message['userName'] = user['userMessage'] # sender name
                         jsonData = json.dumps(message)
-                        sock = getSocket(message['reciever'], clients)
+                        sock = getSocket(message['receiver'], clients)
                         sock.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
+                        
 
-
-                
                     elif(message['isGroup']):
                         for client_socket in clients:
                             # But don't sent it to sender
@@ -189,7 +206,6 @@ if __name__ == '__main__':
         # It's not really necessary to have this, but will handle some socket exceptions just in case
         print(exception_sockets)
         for notified_socket in exception_sockets:
-            # print(notified_socket)
             # Remove from list for socket.socket()
             sockets_list.remove(notified_socket)
 

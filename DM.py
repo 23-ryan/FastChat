@@ -11,7 +11,7 @@ from termcolor import colored
 from client import connectMydb
 
 
-def handleDM(MY_USERNAME, OTHER_USERNAME, client_socket, proxy):
+def handleDM(MY_USERNAME, OTHER_USERNAME, client_socket, proxy, isGroup):
 
         sockets_list = [sys.stdin, client_socket]
 
@@ -23,8 +23,9 @@ def handleDM(MY_USERNAME, OTHER_USERNAME, client_socket, proxy):
                     if(client_socket == sockets):
                         data = unpack_message(sockets)
                         data = receive_message(data, proxy)
-                        if(data):
-                            print(f"{data[0]} > ", colored(f'{data[1]}', 'white', 'on_red'))
+                        # DON'T PRINT THE MESSAGE OF OTHER USER IN ONE'S TERMINAL
+                        if(data and data[1] == OTHER_USERNAME):
+                            print(f"{data[0]} > ", colored(f'{data[2]}', 'white', 'on_red'))
                         # If we received no data, server gracefully closed a connection, for example using socket.close() or socket.shutdown(socket.SHUT_RDWR)
                     
                     else:
@@ -42,7 +43,7 @@ def handleDM(MY_USERNAME, OTHER_USERNAME, client_socket, proxy):
                             img_json = ""
                             if(path != ""):
                                 with open(path, 'rb') as f:
-                                    img_json = {'userMessage':f"{message}", 'sender':f"{MY_USERNAME}" , 'receiver':f"{OTHER_USERNAME}",  'imageFormat': f"{path.split('.')[-1]}", 'imageData':f"{base64.encodebytes(f.read()).decode('utf-8')}", 'isGroup':False}
+                                    img_json = {'userMessage':f"{message}", 'sender':f"{MY_USERNAME}" , 'receiver':f"{OTHER_USERNAME}",  'imageFormat': f"{path.split('.')[-1]}", 'imageData':f"{base64.encodebytes(f.read()).decode('utf-8')}", 'isGroup':isGroup}
                                     print("Image sent")
                                 jsonData = json.dumps(img_json)
                                 client_socket.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
@@ -64,7 +65,7 @@ def handleDM(MY_USERNAME, OTHER_USERNAME, client_socket, proxy):
                             print("ksdks")
                             
                             # Encode message to bytes, prepare header and convert to bytes, like for username above, then send
-                            jsonData = json.dumps({'userMessage':f"{message}",'sender':f"{MY_USERNAME}", 'receiver':f"{OTHER_USERNAME}", 'isGroup':False})
+                            jsonData = json.dumps({'userMessage':f"{message}",'sender':f"{MY_USERNAME}", 'receiver':f"{OTHER_USERNAME}", 'isGroup':isGroup})
                             client_socket.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
 
                     

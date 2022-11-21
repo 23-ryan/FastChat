@@ -1,5 +1,4 @@
 # "" are used to make table names case insensitive
-
 from base64 import decode
 import socket
 import select
@@ -37,14 +36,10 @@ def isValidPassword(userName, password):
     return recordPassword[0][0]
 
 def checkUserName(userName):
-    print("hehe")
-    cur = connectToDb()
-    print("hi")
-    query = f'''SELECT username FROM userinfo;'''
+    cur = connectToDb()    
+    query = f'''SELECT username FROM userinfo'''
     cur.execute(query)
-    print("hoho")
     record = cur.fetchall()
-    print(record)
     return (f"{userName}",) in record
 
 
@@ -93,6 +88,82 @@ def unpack_message(client_socket):
 def getSocket(reciever, clients):
     return list(clients.keys())[list(clients.values()).index(reciever)]
 
+# def fetchUsersInGroup(groupName):
+
+def createGroupAtServer(grpName, ADMIN):
+    cur = connectToDb()
+    query = f'''CREATE TABLE "{grpName}"(
+                name TEXT);'''
+    cur.execute(query)
+
+    # public key = -1 TO identify a group into userinfo table #
+    query = f'''INSERT INTO userinfo
+                VALUES('{grpName}', '', -1, -1)'''
+    cur.execute(query)
+    
+    query = f'''INSERT INTO "{grpName}"
+                VALUES('{ADMIN}')'''
+    cur.execute(query)
+
+def addUserToGroup(grpName, newuser):
+    cur = connectToDb()
+    query = f'''INSERT INTO "{grpName}"
+                VALUES('{newuser}');'''
+    cur.execute(query)
+
+
+def getUsersList(grpName):
+    cur = connectToDb()
+    query = f'''SELECT name FROM "{grpName}"'''
+    cur.execute(query)
+    record = cur.fetchall()
+    usersList = [i[0] for i in record]
+    return usersList
+
+
+def initialize():
+    cur = connectToDb()
+    lis = ['pending', 'userinfo']
+    for table in lis:
+        query = f'''SELECT EXISTS (
+                SELECT FROM
+                    pg_tables
+                WHERE
+                    schemaname = 'public' AND
+                    tablename  = '{table}'
+                )'''
+        cur.execute(query)
+        response = cur.fetchall()[0][0]
+        if(not response):
+            if(table == 'userinfo'):
+                query = f'''CREATE TABLE userinfo(
+                            username TEXT,
+                            password TEXT,
+                            publicn BIGINT,
+                            publice BIGINT);'''
+                cur.execute(query)
+            elif(table == 'pending'):
+                query = f'''CREATE TABLE pending(
+                            sender TEXT,
+                            receiver TEXT,
+                            grpName TEXT,
+                            message TEXT);'''
+                cur.execute(query)
+
+def handlePendingMessages(client_socket):
+    receiverName = clients[client_socket]
+    cur = connectToDb()
+    query = f'''SELECT * FROM pending WHERE receiver = '{receiverName}';'''
+    cur.execute(query)
+    record = cur.fetchall()
+    for rec in record:
+        print("------------------GAYA_-------")
+        isGroup = True
+        if(rec[2] == ""):
+            isGroup = False
+        message = {'sender':f"{rec[0]}", 'receiver':f"{rec[1]}", 'grpName':f"{rec[2]}", 'userMessage':f"{rec[3]}", 'isGroup':isGroup}
+        jsonData = json.dumps(message)
+        client_socket.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
 
 if __name__ == '__main__':
 
@@ -118,9 +189,11 @@ if __name__ == '__main__':
     rpcServer.register_function(addNewUser)
     rpcServer.register_function(checkUserName)
     rpcServer.register_function(getPublicKey)
+    rpcServer.register_function(createGroupAtServer)
     # rpcServer.serve_forever()
     rpcServer.server_activate()
 
+    initialize()
     while True:
         # Of these three lists, returned by the selet method, 1st is the one which has all sockets whcih are ready to proceed.
         # 3rd is the one which throws some exception
@@ -134,6 +207,7 @@ if __name__ == '__main__':
                         continue
                     sockets_list.append(client_socket)
                     clients[client_socket] = user
+                    handlePendingMessages(client_socket)
                     print('Accepted new connection from {}:{}, username: {}'.format(*client_address, user['userMessage']))
 
                 else:
@@ -162,29 +236,37 @@ if __name__ == '__main__':
                     if(not message['isGroup']):
                         # message['userName'] = user['userMessage'] # sender name
                         jsonData = json.dumps(message)
-                        sock = getSocket(message['reciever'], clients)
+                        sock = getSocket(message['receiver'], clients)
                         sock.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
 
+                        if not message['receiver'] in list(clients.values()):
+                            cur = connectToDb()
+                            query = f'''INSERT INTO pending
+                                        VALUES('{message['sender']}', '{message['receiver']}', '', '{message['userMessage']}');'''
+                            cur.execute(query)
 
                 
                     elif(message['isGroup']):
+                        usersList = getUsersList(message['receiver'])
+                        message['grpName'] = message['receiver']
                         for client_socket in clients:
                             # But don't sent it to sender
-                            if client_socket != iter_socket:
-
-                                if(message['userMessage'] == "SEND IMAGE"):
-                                    # message['userName'] = user['userMessage']
-                                    jsonData = json.dumps(message)
-                                    client_socket.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
-                                    print("sent from server")
-                                    continue
+                            if client_socket != iter_socket and (clients[client_socket] in usersList):
+                                message['receiver'] = clients[client_socket]
+                                
                                 # Send user and message (both with their headers)
                                 # We are reusing here message header sent by sender, and saved username header send by user when he connected
 
-                                # message['userName'] = user['userMessage']
                                 jsonData = json.dumps(message)
                                 client_socket.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
                         
+                        for groupMem in usersList:
+                            message['receiver'] = groupMem
+                            if(not groupMem in list(clients.values())):
+                                cur = connectToDb()
+                                query = f'''INSERT INTO pending
+                                            VALUES('{message['sender']}', '{message['receiver']}', '{message['grpName']}', '{message['userMessage']}');'''
+                                cur.execute(query)
 
         # It's not really necessary to have this, but will handle some socket exceptions just in case
         print(exception_sockets)

@@ -48,7 +48,8 @@ def handleSignUp(proxy, IP, PORT):
                     publice BIGINT,
                     privated BIGINT,
                     privatep BIGINT,
-                    privateq BIGINT);'''
+                    privateq BIGINT,
+                    isAdmin BOOLEAN);'''
         cur.execute(query)
         
         return userName, client_socket

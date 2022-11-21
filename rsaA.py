@@ -1,6 +1,7 @@
 import rsa
 
-public, private = rsa.newkeys(1600)
+public, private = rsa.newkeys(32)
+print(list(public))
 message = "hel2323 akshais askans ksnaknsansaksas aosa soasjoajsoa sasa sa0siais0ai0sia0 hel2323 akshais askans ksnaknsansaksas aosa soasjoajsoa sasa sa0siais0ai0sia0 hel2323 akshais askans"
 k = rsa.encrypt(message.encode(), public)
 print(rsa.decrypt(k, private).decode())

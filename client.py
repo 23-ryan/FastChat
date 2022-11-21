@@ -1,4 +1,3 @@
-
 import os
 import socket
 import select
@@ -14,6 +13,16 @@ import rsa
 HEADER_LENGTH = 10
 
 # function to connect to the database
+
+def isAdminOfGroup(grpName, MY_USERNAME):
+    cur = connectMydb(MY_USERNAME)
+    query = f'''SELECT isAdmin FROM connections WHERE username = '{grpName}';'''
+    cur.execute(query)
+    record = cur.fetchall()
+    if(record == []):
+        return False
+
+    return record[0][0]
 
 def decryptMessage(message, cur, MY_USERNAME):
     query =f'''SELECT publicn,publice,privated,privatep,privateq FROM
@@ -31,6 +40,13 @@ def receive_message(data, proxy):
         return None
     print(data)
     sender = data['sender']
+    
+    # When message in a group is received the sender would be the person swending it ,
+    # while according to the implementation we need to enter in table of sender/grpName
+    grpName = sender
+    if(data['isGroup']):
+        grpName = data['grpName']
+
     MY_USERNAME = data['receiver']
     message = data['userMessage']
 
@@ -48,13 +64,30 @@ def receive_message(data, proxy):
                 f.write(base64.b64decode(data["imageData"]))
                 print('recieved Image')
 
+    if message == "ADD_PARTICIPANT":
+        cur = connectMydb(MY_USERNAME)
+        query = f'''CREATE TABLE "{data['grpName']}"(
+                name TEXT,
+                message TEXT);'''
+        cur.execute(query)
+
+        # #############################TODO################################ #
+        # YOU MUST HAVE TO DECRYPT PRIVATE KEY USING THE PUBLIC KEY OF THIS USER
+        # #############################TODO################################ #
+
+        query = f'''INSERT INTO connections
+                    VALUES('{data['grpName']}', {data['privateKey'][0]}, {data['privateKey'][1]}, {data['privateKey'][2]}, {data['privateKey'][3]}, {data['privateKey'][4]}, False)'''
+        cur.execute(query)
+        return True
+
+            
     # storing the data into the table corresponding to the sender
     query = f'''SELECT EXISTS (
             SELECT FROM
                 pg_tables
             WHERE
                 schemaname = 'public' AND
-                tablename  = '{sender}'
+                tablename  = '{grpName}'
             )'''
     cur.execute(query)
     response = cur.fetchall()[0][0]
@@ -62,7 +95,7 @@ def receive_message(data, proxy):
 
     # If table already exists
     if(response):
-        query = f'''INSERT INTO "{sender}"
+        query = f'''INSERT INTO "{grpName}"
             VALUES('{sender}', '{message}')'''
         cur.execute(query)
         # print(colored(f'{decryptedMessage}', 'white', 'on_red'))
@@ -74,7 +107,7 @@ def receive_message(data, proxy):
         cur.execute(query)
         # print(colored(f'{decryptedMessage}', 'white', 'on_red'))
     
-    return (sender, decryptedMessage)
+    return (sender, grpName, decryptedMessage)
 
 
 def checkSocketReady(socket):
@@ -96,6 +129,16 @@ def getPublicKey(reciever, sender):
     # print(record)
     publicKey = rsa.key.PublicKey(record[0],record[1])
     return publicKey
+
+def getPrivateKey(group, sender):
+    cur = connectMydb(sender)
+    query = f'''SELECT publicn ,publice, privated, privatep, privateq from connections
+                WHERE username = '{group}';'''
+    cur.execute(query)
+    record = cur.fetchall()[0]
+    # print(record)
+    # publicKey = rsa.key.PublicKey(record[0],record[1], record[2], record[3], record[4])
+    return record
 
 def goOnline(username, IP, PORT):
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -158,7 +201,7 @@ def addNewDM(MY_USERNAME, username, proxy):
         print("HELLO")
         cur = connectMydb(MY_USERNAME)
         query = f'''INSERT INTO connections
-                    VALUES('{username}', {publicKey[0]}, {publicKey[1]}, -1, -1, -1);'''
+                    VALUES('{username}', {publicKey[0]}, {publicKey[1]}, -1, -1, -1, FALSE);'''
         cur.execute(query)
 
         query = f'''SELECT EXISTS (
@@ -210,77 +253,28 @@ def unpack_message(client_socket):
         # Something went wrong like empty message or client exited abruptly.
         return False
 
+def createGroup(grpName, ADMIN, proxy):
+    cur = connectMydb(ADMIN)
+    ###########################
+    publicKey, privateKey = rsa.newkeys(30)
+                                
+    query = f'''INSERT INTO connections
+            VALUES('{grpName}',{publicKey['n']}, {publicKey['e']}, {privateKey['d']}, {privateKey['p']}, {privateKey['q']}, TRUE)'''
 
+    cur.execute(query)
+    ###########################
+    proxy.createGroupAtServer(grpName, ADMIN)
 
-# if __name__ == '__main__':
+    query = f'''CREATE TABLE "{grpName}"(
+                name TEXT,
+                message TEXT);'''
+    cur.execute(query)
 
-#     HEADER_LENGTH = 10
-
-#     IP = sys.argv[1]
-#     PORT = int(sys.argv[2])
-#     my_username = input("Username: ")
-
-#     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-#     client_socket.connect((IP, PORT))
-#     client_socket.setblocking(False)
-#     username = my_username
-#     username_header = f"{len(username):<{HEADER_LENGTH}}"
-#     data = {'userHeader':f"{username_header}", 'userMessage':f"{username}"}
-#     jsonData = json.dumps(data)
-#     print(f'{len(jsonData):<10}')
-#     client_socket.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
-
-#     sockets_list = [sys.stdin, client_socket]
-
-
-#     while True:
-#         try:
-#             read_sockets, _, error_sockets = select.select(sockets_list,[], sockets_list)
-#             for sockets in read_sockets:
-#                 # LEAVE GROUP message
-#                 if(client_socket == sockets):
-#                     data = unpack_message(sockets)
-#                     # If we received no data, server gracefully closed a connection, for example using socket.close() or socket.shutdown(socket.SHUT_RDWR)
-#                     recieve_message(data)
-
-#                 else:
-#                     message = sys.stdin.readline()[0:-1]
-#                     if message == "LEAVE GROUP":
-#                         jsonData = json.dumps({'userMessage':f"{message}"})
-#                         client_socket.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
-#                         print("You are no longer a participant of this group")
-#                         sys.exit()
-
-#                     elif message == "SEND IMAGE":
-#                         path = input("PATH OF IMAGE: ")
-#                         img_json = ""
-#                         if(path != ""):
-#                             with open(path, 'rb') as f:
-#                                 img_json = {'userMessage':f"{message}", 'imageFormat': f"{path.split('.')[-1]}", 'imageData':f"{base64.encodebytes(f.read()).decode('utf-8')}"}
-#                                 print("Image sent")
-#                             jsonData = json.dumps(img_json)
-#                             client_socket.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
-            
-
-#                     elif message != "":
-#                         # Encode message to bytes, prepare header and convert to bytes, like for username above, then send
-#                         jsonData = json.dumps({'userMessage':f"{message}"})
-#                         client_socket.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
-
-                
-#         except IOError as e:
-#             # This is normal on non blocking connections - when there are no incoming data, error is going to be raised
-#             # Some operating systems will indicate that using AGAIN, and some using WOULDBLOCK error code
-#             # We are going to check for both - if one of them - that's expected, means no incoming data, continue as normal
-#             # If we got different error code - something happened
-#             if e.errno != errno.EAGAIN and e.errno != errno.EWOULDBLOCK:
-#                 print('Reading error2: {}'.format(str(e)))
-#                 sys.exit()
-#             # We just did not receive anything
-#             continue
-
-#         except Exception as e:
-#             # Any other exception - something happened, exit
-#             print('Reading error1: {}'.format(str(e)))
-#             sys.exit()
+##########################################
+################ TODO ####################
+# Recieve ack from client , try doing for messages when receiver is active too!
+# Admin can remove 
+# Pointer to last read messages so the rest are printed when the user opens the interface
+# Online-Offline status updation and storing-sending messages accordingly
+# ENCRYPTION
+# Multi-server load balancing

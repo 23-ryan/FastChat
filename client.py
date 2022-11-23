@@ -11,30 +11,35 @@ import psycopg2
 import rsa
 
 HEADER_LENGTH = 10
-# function to connect to the database
+"""
+In order to communicate large messages over a socket, they are broken into multiple smaller messages.
+The first HEADER_LENGTH characters of the initial message inform the listener how many bytes of data to receive, so that they may stop listening once these many bytes have been received.
+"""  # pylint: disable=W0105
+
 
 def handlePendingMessages(client_pending_socket, proxy):
     while True:
         bo = False
-        read_sockets, _, error_sockets = select.select([client_pending_socket],[], [client_pending_socket])
+        read_sockets, _, error_sockets = select.select(
+            [client_pending_socket], [], [client_pending_socket])
         for socket in read_sockets:
             if socket == client_pending_socket:
                 data = unpack_message(socket)
-                if(data['isComplete']):
+                if (data['isComplete']):
                     bo = True
                     break
 
-                ############## QUERIES
+                # QUERIES
                 sender = data['sender']
                 MY_USERNAME = data['receiver']
                 message = data['userMessage']
                 # When message in a group is received the sender would be the person swending it ,
                 # while according to the implementation we need to enter in table of sender/grpName
                 grpName = sender
-                if(data['isGroup']):
+                if (data['isGroup']):
                     grpName = data['grpName']
-                if(not data['isGroup']):
-                    if(message=="REMOVE_PARTICIPANT"):
+                if (not data['isGroup']):
+                    if (message == "REMOVE_PARTICIPANT"):
                         grpName = data['grpName']
 
                 cur = connectMydb(MY_USERNAME)
@@ -52,7 +57,7 @@ def handlePendingMessages(client_pending_socket, proxy):
                 response = cur.fetchall()[0][0]
 
                 if message == "SEND IMAGE":
-                    if(not response):
+                    if (not response):
                         addNewDM(MY_USERNAME, sender, proxy)
 
                     query = f'''SELECT COALESCE(MAX(messageId), 0) FROM "{grpName}";'''
@@ -68,7 +73,7 @@ def handlePendingMessages(client_pending_socket, proxy):
                     cur.execute(query)
 
                     # return (sender, grpName, decryptedMessage, data['messageId'], data['imageFormat'], data['imageData'])
-                
+
                 if message == "ADD_PARTICIPANT":
                     cur = connectMydb(MY_USERNAME)
                     query = f'''CREATE TABLE "{grpName}"(
@@ -87,14 +92,14 @@ def handlePendingMessages(client_pending_socket, proxy):
                     # return (sender, grpName, decryptedMessage, data['messageId'])
 
                 # if message == "REMOVE_PARTICIPANT":
-                # NOT HERE , as we have to let user know that he is removed so drop table only when 
+                # NOT HERE , as we have to let user know that he is removed so drop table only when
                 # only when he opens the group
-                        
+
                 # storing the data into the table corresponding to the sender
                 # print(type(response))
                 else:
                     # If table already exists
-                    if(response):
+                    if (response):
                         query = f'''SELECT COALESCE(MAX(messageId), 0) FROM "{grpName}";'''
                         cur.execute(query)
                         record = cur.fetchall()
@@ -103,7 +108,7 @@ def handlePendingMessages(client_pending_socket, proxy):
                             VALUES('{sender}', '{message}', {nextRowNum})'''
                         cur.execute(query)
                         # print(colored(f'{decryptedMessage}', 'white', 'on_red'))
-                    if(not response):
+                    if (not response):
                         addNewDM(MY_USERNAME, sender, proxy)
                         query = f'''SELECT COALESCE(MAX(messageId), 0) FROM "{grpName}";'''
                         cur.execute(query)
@@ -115,35 +120,66 @@ def handlePendingMessages(client_pending_socket, proxy):
 
                 # #################
                 ack = "__ACK__"
-                jsonData = json.dumps({'userMessage':f"{ack}"})
-                client_pending_socket.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
-        if(bo):
+                jsonData = json.dumps({'userMessage': f"{ack}"})
+                client_pending_socket.send(
+                    bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
+        if (bo):
             break
     client_pending_socket.close()
 
 
 def isAdminOfGroup(grpName, MY_USERNAME):
+    """
+
+    :type [grpName]: str
+    :type [MY_USERNAME]: str
+    :type [data]: int
+    :return: whether MY_USERNAME is an admin of grpName
+    :rtype: bool
+    """
     cur = connectMydb(MY_USERNAME)
     query = f'''SELECT isAdmin FROM connections WHERE username = '{grpName}';'''
     cur.execute(query)
     record = cur.fetchall()
-    if(record == []):
+    if (record == []):
         return False
 
     return record[0][0]
 
+
 def decryptMessage(message, cur, MY_USERNAME):
-    query =f'''SELECT publicn,publice,privated,privatep,privateq FROM
+    """
+    :param [message]: encrypted message
+    :type [message]: str
+    :param [cur]: cursor pointing to the user's local database
+    :type [cur]: _Cursor
+    :param [MY_USERNAME]: username of the client in question
+    :type [MY_USERNAME]: str
+
+    :return: the decrypted message
+    :rtype: str
+    """
+    query = f'''SELECT publicn,publice,privated,privatep,privateq FROM
                 userinfo WHERE username = {MY_USERNAME};'''
     cur.execute(query)
     components = cur.fetchall()[0]
-    PrivateKey = rsa.key.PrivateKey(components[0],components[1],components[2],components[3],components[4])
+    PrivateKey = rsa.key.PrivateKey(
+        components[0], components[1], components[2], components[3], components[4])
     # check if has been already decoded or not
-    decryptedMessage = rsa.decrypt(message,PrivateKey).decode()
+    decryptedMessage = rsa.decrypt(message, PrivateKey).decode()
     return decryptedMessage
 
+
 def receive_message(data, proxy):
+    """Handle the reception of normal messages as well as the SEND_IMAGE and ADD_PARTICIPANT keywords along with updating the user-side database
+
+    :param [data]: dictionary containing all details of the message received
+    :type [data]: dict
+    :param [proxy]: proxy server for remote calls
+    :type [proxy]: ServerProxy
+    """
     if not data:
+        # graceful termination has already been achieved
         print('Connection closed by the server')
         return None
     # print(data)
@@ -153,10 +189,10 @@ def receive_message(data, proxy):
     # When message in a group is received the sender would be the person swending it ,
     # while according to the implementation we need to enter in table of sender/grpName
     grpName = sender
-    if(data['isGroup']):
+    if (data['isGroup']):
         grpName = data['grpName']
-    if(not data['isGroup']):
-        if(message=="REMOVE_PARTICIPANT"):
+    if (not data['isGroup']):
+        if (message == "REMOVE_PARTICIPANT"):
             grpName = data['grpName']
 
     cur = connectMydb(MY_USERNAME)
@@ -174,7 +210,7 @@ def receive_message(data, proxy):
     response = cur.fetchall()[0][0]
 
     if message == "SEND IMAGE":
-        if(not response):
+        if (not response):
             addNewDM(MY_USERNAME, sender, proxy)
 
         query = f'''SELECT COALESCE(MAX(messageId), 0) FROM "{grpName}";'''
@@ -190,7 +226,6 @@ def receive_message(data, proxy):
         cur.execute(query)
         return (sender, grpName, decryptedMessage, data['messageId'], True, data['imageFormat'], data['imageData'])
 
-    
     if message == "ADD_PARTICIPANT":
         cur = connectMydb(MY_USERNAME)
         query = f'''CREATE TABLE "{grpName}"(
@@ -209,14 +244,14 @@ def receive_message(data, proxy):
         return (sender, grpName, decryptedMessage, data['messageId'], False)
 
     # if message == "REMOVE_PARTICIPANT":
-    # NOT HERE , as we have to let user know that he is removed so drop table only when 
+    # NOT HERE , as we have to let user know that he is removed so drop table only when
     # only when he opens the group
-            
+
     # storing the data into the table corresponding to the sender
     # print(type(response))
     else:
         # If table already exists
-        if(response):
+        if (response):
             query = f'''SELECT COALESCE(MAX(messageId), 0) FROM "{grpName}";'''
             cur.execute(query)
             record = cur.fetchall()
@@ -225,7 +260,7 @@ def receive_message(data, proxy):
                 VALUES('{sender}', '{message}', {nextRowNum})'''
             cur.execute(query)
             # print(colored(f'{decryptedMessage}', 'white', 'on_red'))
-        if(not response):
+        if (not response):
             addNewDM(MY_USERNAME, sender, proxy)
             query = f'''SELECT COALESCE(MAX(messageId), 0) FROM "{grpName}";'''
             cur.execute(query)
@@ -235,31 +270,53 @@ def receive_message(data, proxy):
                         VALUES('{sender}', '{message}', {nextRowNum});'''
             cur.execute(query)
         # print(colored(f'{decryptedMessage}', 'white', 'on_red'))
-    
+
     return (sender, grpName, decryptedMessage, data['messageId'], False)
 
 
 def checkSocketReady(socket):
-    # print("hello")
-    read_sockets, _, error_sockets = select.select([socket],[], [socket], 0.01)
+    """
+    :param [socket]: socket in question
+    :type [socket]: socket
+    :return: return the socket if it is ready to be read, otherwise return false
+    :rtype: bool
+    """
+    read_sockets, _, error_sockets = select.select(
+        [socket], [], [socket], 0.01)
     if read_sockets != []:
         return read_sockets[0]
     else:
         return False
-        
-        
+
 
 def getPublicKey(reciever, sender):
+    """
+    :param [reciever]: username of the receiver of the message
+    :type [reciever]: str
+    :param [sender]: username of the sender of the message
+    :type [sender]: str
+    :return: parameters n and e of the public key of the receiver
+    :rtype: list
+    """
     cur = connectMydb(sender)
     query = f'''SELECT publicn ,publice from connections
                 WHERE username = '{reciever}';'''
     cur.execute(query)
     record = cur.fetchall()[0]
     # print(record)
-    publicKey = rsa.key.PublicKey(record[0],record[1])
+    publicKey = rsa.key.PublicKey(record[0], record[1])
     return publicKey
 
+
 def getPrivateKey(group, sender):
+    """
+    :param [group]: group of which the sender is a participant
+    :type [group]: str
+    :param [sender]: username of the sender of the message
+    :type [sender]: str
+    :return: parameters the private key of the group
+    :rtype: tuple
+    """
     cur = connectMydb(sender)
     query = f'''SELECT publicn ,publice, privated, privatep, privateq from connections
                 WHERE username = '{group}';'''
@@ -269,7 +326,18 @@ def getPrivateKey(group, sender):
     # publicKey = rsa.key.PublicKey(record[0],record[1], record[2], record[3], record[4])
     return record
 
+
 def goOnline(username, IP, PORT):
+    """
+    :param [username]: group of which the sender is a participant
+    :type [username]: str
+    :param [IP]: IP address of the server
+    :type [IP]: str
+    :param [PORT]: PORT of the server
+    :type [PORT]: int
+    :return: parameters the private key of the group
+    :rtype: tuple
+    """
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client_pending_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -280,26 +348,48 @@ def goOnline(username, IP, PORT):
 
     username_header = f"{len(username):<{HEADER_LENGTH}}"
 
-    data1 = {'userHeader':f"{username_header}", 'userMessage':f"{username}", 'isPending':False}
+    data1 = {'userHeader': f"{username_header}",
+             'userMessage': f"{username}", 'isPending': False}
     jsonData1 = json.dumps(data1)
 
     # print(f'{len(jsonData1):<10}')
-    data2 = {'userHeader':f"{username_header}", 'userMessage':f"{username}", 'isPending':True}
+    data2 = {'userHeader': f"{username_header}",
+             'userMessage': f"{username}", 'isPending': True}
     jsonData2 = json.dumps(data2)
 
-    client_socket.send(bytes(f'{len(jsonData1):<10}{jsonData1}', encoding='utf-8'))
-    client_pending_socket.send(bytes(f'{len(jsonData2):<10}{jsonData2}', encoding='utf-8'))
+    client_socket.send(
+        bytes(f'{len(jsonData1):<10}{jsonData1}', encoding='utf-8'))
+    client_pending_socket.send(
+        bytes(f'{len(jsonData2):<10}{jsonData2}', encoding='utf-8'))
 
     return client_socket, client_pending_socket
 
+
 def connectMydb(dbName):
-    conn = psycopg2.connect(database =f"{dbName}", user = "postgres", password = "postgres", host = "localhost", port = "5432")
+    """
+    :param [dbName]: username of the client whose database we need to connect to
+    :type [dbName]: str
+    :return: cursor pointing to that user's local database
+    :rtype: _Cursor
+    """
+    conn = psycopg2.connect(
+        database=f"{dbName}", user="postgres", password="postgres", host="localhost", port="5432")
     conn.autocommit = True
     cur = conn.cursor()
     return cur
 
 # check the availability in connections table
+
+
 def isInConnections(MY_USERNAME, username):
+    """
+    :param [MY_USERNAME]: username of the client whose connections we need to check
+    :type [MY_USERNAME]: str
+    :param [username]: username of the other client
+    :type [username]: str
+    :return: whether username is in MY_USERNAME's connections
+    :rtype: bool
+    """
     cur = connectMydb(MY_USERNAME)
     query = f'''SELECT username FROM connections;'''
     cur.execute(query)
@@ -310,9 +400,15 @@ def isInConnections(MY_USERNAME, username):
 
 # returns lists of all the users and groups to get listed
 def getAllUsers(MY_USERNAME):
+    """
+    :param [MY_USERNAME]: username of the client whose connections we need to check
+    :type [MY_USERNAME]: str
+    :return: lists DM, group of all the users and groups in MY_USERNAME's connections
+    :rtype: list, list
+    """
     DM = []
-    group = [] 
-    
+    group = []
+
     cur = connectMydb(MY_USERNAME)
     query = f'''SELECT username FROM connections WHERE privated = -1;'''
     cur.execute(query)
@@ -331,8 +427,17 @@ def getAllUsers(MY_USERNAME):
 
 #  Adding a new DM as requested by the user
 def addNewDM(MY_USERNAME, username, proxy):
+    """Adding a new DM to username as requested by MY_USERNAME
+
+    :param [MY_USERNAME]: username of the client who requested DM
+    :type [MY_USERNAME]: str
+    :param [username]: username of the other client
+    :type [username]: str
+    :return: True for success and False for failure
+    :rtype: bool
+    """
     # checking that the user is registered with the app or not
-    if(not proxy.checkUserName(username)):
+    if (not proxy.checkUserName(username)):
         # print("HELLO")
         return False
     else:
@@ -353,39 +458,45 @@ def addNewDM(MY_USERNAME, username, proxy):
         cur.execute(query)
         response = cur.fetchall()[0][0]
 
-        if(not response):
+        if (not response):
             query = f'''CREATE TABLE "{username}"(
                         person TEXT,
                         message TEXT,
                         messageId INT DEFAULT 0);'''
             cur.execute(query)
-    
+
     return True
 
 
 def unpack_message(client_socket):
+    """Receive as many bytes as specified by the header in units of 16 bytes
+
+    :param [client_socket]: the socket that is receiving data
+    :type [client_socket]: socket
+    :return: Dictionary of the received json data. False if any exception occured
+    :rtype: dict/bool
+    """
     try:
         userData = ''
         new_message = True
         while True:
             temp = client_socket.recv(16).decode('utf-8')
-            if(temp == ""):
+            if (temp == ""):
                 return
-            if(new_message):
+            if (new_message):
                 message_len = int(temp[:HEADER_LENGTH].strip())
                 # print(message_len)
                 userData += temp[HEADER_LENGTH:]
                 new_message = False
                 continue
-            
+
             userData += temp
             # print(len(userData))
             # print(userData)
             # print("USER: ",userData)
-            if(message_len == len(userData)):
+            if (message_len == len(userData)):
                 userData = json.loads(userData)
                 return userData
-
 
         # return {'Len':userData['userHeader'], 'Message':message}
     except JSONDecodeError as e:
@@ -393,11 +504,21 @@ def unpack_message(client_socket):
         # Something went wrong like empty message or client exited abruptly.
         return False
 
+
 def createGroup(grpName, ADMIN, proxy):
+    """Create a new group by updating the database
+
+    :param [grpName]: name of the new group
+    :type [grpName]: str
+    :param [ADMIN]: username of the creator
+    :type [ADMIN]: str
+    :param [proxy]: the proxy server, used for a remote call to createGroupAtServer
+    :type [proxy]: ServerProxy
+    """
     cur = connectMydb(ADMIN)
     ###########################
     publicKey, privateKey = rsa.newkeys(30)
-                                
+
     query = f'''INSERT INTO connections
             VALUES('{grpName}',{publicKey['n']}, {publicKey['e']}, {privateKey['d']}, {privateKey['p']}, {privateKey['q']}, TRUE)'''
 
@@ -411,23 +532,26 @@ def createGroup(grpName, ADMIN, proxy):
                 messageId INT DEFAULT 0);'''
     cur.execute(query)
 
+
 def sendAck(client_socket, messageId, isImage):
     message = "__ACK__"
-    jsonData = json.dumps({'userMessage':f"{message}", 'messageId':f"{messageId}", 'isAck':True, 'isImage':isImage})
-    client_socket.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
+    jsonData = json.dumps({'userMessage': f"{message}",
+                          'messageId': f"{messageId}", 'isAck': True, 'isImage': isImage})
+    client_socket.send(
+        bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
 
 ################ TODO ####################
 # Recieve ack from client , try doing for messages when receiver is active too!
 ##########################################
 # IDEA - what we can do is that check the ack_text = socket.recv() ,
-# now if it is that message has been recieved then send a confiramtion to 
-# server as a message through client and once that is done only then allow the 
+# now if it is that message has been recieved then send a confiramtion to
+# server as a message through client and once that is done only then allow the
 # server to move ahead , set a timeout and if ack is not received in that time
 # store the message as pending messages and continue with the loop
 ##########################################
 # Pointer to last read messages so the rest are printed when the user opens the interface
 # Online-Offline status updation and storing-sending messages accordingly
-# Check  
+# Check
 # ENCRYPTION
 # Multi-server load balancing
 ################ TODO ####################

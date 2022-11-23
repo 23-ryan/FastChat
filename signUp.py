@@ -15,11 +15,11 @@ def handleSignUp(proxy, IP, PORT):
         password = input("Password: ")
 
         publickey, privatekey = rsa.newkeys(30)
-        print(privatekey)
-        print(privatekey['d'], privatekey['p'], privatekey['q'])
+        # print(privatekey)
+        # print(privatekey['d'], privatekey['p'], privatekey['q'])
         proxy.addNewUser(userName, password, publickey['n'], publickey['e'])
         print(colored('USER SUCCESSFULLY REGISTERED !!', 'yellow'))
-        client_socket = goOnline(userName, IP, PORT)
+        client_socket, client_pending_socket = goOnline(userName, IP, PORT)
 
         # CREATE CONNECTIONS TABLE
         
@@ -49,10 +49,11 @@ def handleSignUp(proxy, IP, PORT):
                     privated BIGINT,
                     privatep BIGINT,
                     privateq BIGINT,
-                    isAdmin BOOLEAN);'''
+                    isAdmin BOOLEAN,
+                    readUpto INT DEFAULT 0);'''
         cur.execute(query)
         
-        return userName, client_socket
+        return userName, client_socket, client_pending_socket
 
     else:
         print("INVALID USERNAME! ")

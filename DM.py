@@ -6,12 +6,51 @@ import sys
 import rsa
 import json
 import base64
-from client import receive_message, getPublicKey, unpack_message
+from client import receive_message, getPublicKey, unpack_message, sendAck
 from termcolor import colored
 from client import connectMydb
 
 
 def handleDM(MY_USERNAME, OTHER_USERNAME, client_socket, proxy, isGroup):
+        cur = connectMydb(MY_USERNAME)
+        query = f'''SELECT readUpto FROM connections WHERE username = '{OTHER_USERNAME}';'''
+        cur.execute(query)
+        readUpto = cur.fetchall()[0][0]
+        query = f'''SELECT * FROM "{OTHER_USERNAME}" WHERE messageId > {readUpto}'''
+        cur.execute(query)
+        record = cur.fetchall()
+
+        isImage = False
+        finalMessageId = 0
+        for rec in record:
+            if(isImage):
+                ans = input("DO YOU WANT TO RECIEVE AN IMAGE SENT(YES/NO ?):")
+                if(ans.upper() == "YES"):
+                    name = input("SAVE IMAGE AS: ")
+                    os.system(f'touch {name}.{rec[0]}')
+                    with open(f'{name}.{rec[0]}', 'wb') as f:
+                        f.write(base64.b64decode(rec[1]))
+                        print(colored('RECEIVED IMAGE!!', 'green'))
+                isImage = False
+
+            elif(rec[1] == "SEND IMAGE"):
+                isImage = True
+                
+            elif(rec[1] == "REMOVE_PARTICIPANT"):
+                query = f'''DROP TABLE "{OTHER_USERNAME}";'''
+                cur.execute(query)
+                query = f'''DELETE FROM connections WHERE username = '{OTHER_USERNAME}';'''
+                cur.execute(query)
+                print(colored("YOU WERE KICKED FROM THE GROUP!", 'yellow'))
+
+            else:
+                print(f"{rec[0]} > ", colored(f'{rec[1]}', 'white', 'on_red'))
+            
+            finalMessageId = rec[2]
+        
+        if(finalMessageId != 0):
+            query = f'''UPDATE connections SET readUpto = {finalMessageId} WHERE username = '{OTHER_USERNAME}';'''
+            cur.execute(query)
 
         sockets_list = [sys.stdin, client_socket]
 
@@ -23,17 +62,38 @@ def handleDM(MY_USERNAME, OTHER_USERNAME, client_socket, proxy, isGroup):
                     if(client_socket == sockets):
                         data = unpack_message(sockets)
                         data = receive_message(data, proxy)
+                        
+                        sendAck(client_socket, data[3], data[4])
+
+                        if(data and data[1] == OTHER_USERNAME and data[2]=="REMOVE_PARTICIPANT"):
+                            cur = connectMydb(MY_USERNAME)
+                            query = f'''DROP TABLE "{OTHER_USERNAME}";'''
+                            cur.execute(query)
+                            query = f'''DELETE FROM connections WHERE username = '{OTHER_USERNAME}';'''
+                            cur.execute(query)
+                            print(colored("YOU WERE KICKED FROM THE GROUP!", 'yellow'))
                         # DON'T PRINT THE MESSAGE OF OTHER USER IN ONE'S TERMINAL
-                        if(data and data[1] == OTHER_USERNAME):
+
+                        elif(data and data[1] == OTHER_USERNAME and data[2]=="SEND IMAGE"):
+                            ans = input("DO YOU WANT TO RECIEVE AN IMAGE SENT(YES/NO ?):")
+                            if(ans.upper() == "YES"):
+                                name = input("SAVE IMAGE AS: ")
+                                os.system(f'touch {name}.{data[5]}')
+                                with open(f'{name}.{data[5]}', 'wb') as f:
+                                    f.write(base64.b64decode(data[6]))
+                                    print('recieved Image')
+
+                        elif(data and data[1] == OTHER_USERNAME):
                             print(f"{data[0]} > ", colored(f'{data[2]}', 'white', 'on_red'))
+
                         # If we received no data, server gracefully closed a connection, for example using socket.close() or socket.shutdown(socket.SHUT_RDWR)
-                    
+
                     else:
-                        print("sdsds")
+                        # print("sdsds")
                         print("-------")
                         message = sys.stdin.readline()[0:-1]
                         if message == "LEAVE GROUP":
-                            jsonData = json.dumps({'userMessage':f"{message}"})
+                            jsonData = json.dumps({'userMessage':f"{message}", 'isAck':False})
                             client_socket.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
                             print("You are no longer a participant of this group")
                             sys.exit()
@@ -43,7 +103,7 @@ def handleDM(MY_USERNAME, OTHER_USERNAME, client_socket, proxy, isGroup):
                             img_json = ""
                             if(path != ""):
                                 with open(path, 'rb') as f:
-                                    img_json = {'userMessage':f"{message}", 'sender':f"{MY_USERNAME}" , 'receiver':f"{OTHER_USERNAME}",  'imageFormat': f"{path.split('.')[-1]}", 'imageData':f"{base64.encodebytes(f.read()).decode('utf-8')}", 'isGroup':isGroup}
+                                    img_json = {'userMessage':f"{message}", 'sender':f"{MY_USERNAME}" , 'receiver':f"{OTHER_USERNAME}",  'imageFormat': f"{path.split('.')[-1]}", 'imageData':f"{base64.encodebytes(f.read()).decode('utf-8')}", 'isGroup':isGroup, 'isAck':False}
                                     print("Image sent")
                                 jsonData = json.dumps(img_json)
                                 client_socket.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
@@ -52,20 +112,20 @@ def handleDM(MY_USERNAME, OTHER_USERNAME, client_socket, proxy, isGroup):
                         elif message != "":
                             # print("HERE")
                             publicKey = getPublicKey(OTHER_USERNAME, MY_USERNAME)
-                            print(publicKey)
+                            # print(publicKey)
                             # print(type(message))
                             # message = rsa.encrypt(message.encode('utf-8'),publicKey)
-                            print(message)
+                            # print(message)
 
                             # INSERT data into the table
                             cur = connectMydb(MY_USERNAME)
                             query = f'''INSERT INTO "{OTHER_USERNAME}"
                                     VALUES('{MY_USERNAME}', '{message}')'''
                             cur.execute(query)
-                            print("ksdks")
+                            # print("ksdks")
                             
                             # Encode message to bytes, prepare header and convert to bytes, like for username above, then send
-                            jsonData = json.dumps({'userMessage':f"{message}",'sender':f"{MY_USERNAME}", 'receiver':f"{OTHER_USERNAME}", 'isGroup':isGroup})
+                            jsonData = json.dumps({'userMessage':f"{message}",'sender':f"{MY_USERNAME}", 'receiver':f"{OTHER_USERNAME}", 'isGroup':isGroup, 'isAck':False})
                             client_socket.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
 
                     

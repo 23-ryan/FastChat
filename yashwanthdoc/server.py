@@ -291,9 +291,14 @@ def sendPendingMessages(client_socket, receiverName):
         record = cur.fetchall()
 
     isImg = False
+    isAdd = False
     prevImg = ""
+    prevAdd = ""
+
     for rec in record:
         imgSent = False
+        addSent = False
+
         if (isImg):
             prevImg['imageFormat'] = rec[1]
             prevImg['imageData'] = rec[4]
@@ -302,19 +307,34 @@ def sendPendingMessages(client_socket, receiverName):
                 bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
             imgSent = True
 
+        elif (isAdd):
+            print("hehe")
+            prevAdd['privateKey'] = rec[4]
+            jsonData = json.dumps(prevAdd)
+            client_socket.send(
+                bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
+            addSent = True
+
         isGroup = True
         #######
         # DON'T ENCRYPT SEND IMAGE , ADD_PARTICIPANT
         if (rec[3] == "" or rec[4]=="ADD_PARTICIPANT"):
             isGroup = False
 
-        if (rec[4] == "SEND IMAGE"):
+        if (rec[4] =="ADD_PARTICIPANT"):
+            print("ADD REACHED")
+            prevAdd = {'messageId': f"{rec[0]}", 'sender': f"{rec[1]}", 'receiver': f"{rec[2]}",
+                        'grpName': f"{rec[3]}", 'userMessage': f"{rec[4]}", 'isGroup': isGroup, 'isComplete': False}
+            isAdd = True
+            continue
+
+        elif (rec[4] == "SEND IMAGE"):
             prevImg = {'messageId': f"{rec[0]}", 'sender': f"{rec[1]}", 'receiver': f"{rec[2]}",
                        'grpName': f"{rec[3]}", 'userMessage': f"{rec[4]}", 'isGroup': isGroup, 'isComplete': False}
             isImg = True
             continue
 
-        elif (not imgSent):
+        elif (not imgSent and not addSent):
             print(rec[4])
             message = {'messageId': f"{rec[0]}", 'sender': f"{rec[1]}", 'receiver': f"{rec[2]}",
                        'grpName': f"{rec[3]}", 'userMessage': f"{rec[4]}", 'isGroup': isGroup, 'isComplete': False}
@@ -323,11 +343,13 @@ def sendPendingMessages(client_socket, receiverName):
                 bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
 
         if (receiveAck(client_socket)):
-            if (isImg):
+            if (isImg or isAdd):
+                print(isAdd)
                 query = f'''DELETE FROM pending WHERE SNo = {rec[0]};'''
                 cur.execute(query)
                 query = f'''DELETE FROM pending WHERE SNo = {rec[0]-1};'''
                 isImg = False
+                isAdd = False
             else:
                 query = f'''DELETE FROM pending WHERE SNo = {rec[0]};'''
 
@@ -495,6 +517,14 @@ if __name__ == '__main__':
                                             VALUES({nextRowNum + 1}, '{message['imageFormat']}', '{message['receiver']}', '', '{message['imageData']}');'''
                             cur.execute(query)
 
+                        elif (message['userMessage'] == "ADD_PARTICIPANT"):
+                            query = f'''INSERT INTO pending
+                                            VALUES({nextRowNum}, '{message['sender']}', '{message['receiver']}', '{message['grpName']}', '{message['userMessage']}');'''
+                            cur.execute(query)
+                            query = f'''INSERT INTO pending
+                                            VALUES({nextRowNum+1}, '{message['sender']}', '{message['receiver']}', '', '{message['privateKey']}');'''
+                            cur.execute(query)
+
                         else:
                             query = f'''INSERT INTO pending
                                             VALUES({nextRowNum}, '{message['sender']}', '{message['receiver']}', '', '{message['userMessage']}');'''
@@ -518,6 +548,13 @@ if __name__ == '__main__':
                                             VALUES({nextRowNum + 1}, '{message['imageFormat']}', '{message['receiver']}', '', '{message['imageData']}');'''
                             cur.execute(query)
 
+                        elif (message['userMessage'] == "ADD_PARTICIPANT"):
+                            query = f'''INSERT INTO pending
+                                            VALUES({nextRowNum}, '{message['sender']}', '{message['receiver']}', '{message['grpName']}', '{message['userMessage']}');'''
+                            cur.execute(query)
+                            query = f'''INSERT INTO pending
+                                            VALUES({nextRowNum+1}, '{message['sender']}', '{message['receiver']}', '', '{message['privateKey']}');'''
+                            cur.execute(query)
                         # print(nextRowNum)
                         else:
                             query = f'''INSERT INTO pending

@@ -86,8 +86,13 @@ def handlePendingMessages(client_pending_socket, proxy):
                     # YOU MUST HAVE TO DECRYPT PRIVATE KEY USING THE PUBLIC KEY OF THIS USER
                     # #############################TODO################################ #
 
+                    #### privaet key list is being passed as a string here so handle that issue
+                    data['privateKey'] = data['privateKey'].split(",")
+                    data['privateKey'][0] = data['privateKey'][0][1:]
+                    data['privateKey'][4] = data['privateKey'][4][:-1]
+                    
                     query = f'''INSERT INTO connections
-                                VALUES('{data['grpName']}', {data['privateKey'][0]}, {data['privateKey'][1]}, {data['privateKey'][2]}, {data['privateKey'][3]}, {data['privateKey'][4]}, False)'''
+                                VALUES('{data['grpName']}', {int(data['privateKey'][0])}, {int(data['privateKey'][1])}, {int(data['privateKey'][2])}, {int(data['privateKey'][3])}, {int(data['privateKey'][4])}, False)'''
                     cur.execute(query)
                     # return (sender, grpName, decryptedMessage, data['messageId'])
 
@@ -192,7 +197,8 @@ def receive_message(data, proxy):
     if (data['isGroup']):
         grpName = data['grpName']
     if (not data['isGroup']):
-        if (message == "REMOVE_PARTICIPANT"):
+        ### Message sent only to this person so isGroup false but grpName diff. from sender
+        if (message == "REMOVE_PARTICIPANT" or message == "ADD_PARTICIPANT"):
             grpName = data['grpName']
 
     cur = connectMydb(MY_USERNAME)
@@ -241,7 +247,9 @@ def receive_message(data, proxy):
         query = f'''INSERT INTO connections
                     VALUES('{data['grpName']}', {data['privateKey'][0]}, {data['privateKey'][1]}, {data['privateKey'][2]}, {data['privateKey'][3]}, {data['privateKey'][4]}, False)'''
         cur.execute(query)
-        return (sender, grpName, decryptedMessage, data['messageId'], False)
+        ############
+        # return True for add participant too as we need to delete 2 rows here too
+        return (sender, grpName, decryptedMessage, data['messageId'], True)
 
     # if message == "REMOVE_PARTICIPANT":
     # NOT HERE , as we have to let user know that he is removed so drop table only when

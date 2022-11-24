@@ -65,11 +65,16 @@ def handlePendingMessages(client_pending_socket, proxy):
                     record = cur.fetchall()
                     nextRowNum = record[0][0] + 1
 
+                    encrypted = data["imageData"]
+                    key = data["fernetKey"]
+                    encrypted, key = replace_quote(encrypted, key)
+
                     query = f'''INSERT INTO "{grpName}" 
-                                VALUES ('{sender}','{message}', {nextRowNum});'''
+                                VALUES ('{sender}','{message}', {nextRowNum}, '{key}');'''
                     cur.execute(query)
+
                     query = f'''INSERT INTO "{grpName}"
-                                VALUES ('{data["imageFormat"]}', '{data["imageData"]}', {nextRowNum + 1});'''
+                                VALUES ('{data["imageFormat"]}', '{encrypted}', {nextRowNum + 1}, '{key}');'''
                     cur.execute(query)
 
                     # return (sender, grpName, decryptedMessage, data['messageId'], data['imageFormat'], data['imageData'])
@@ -79,7 +84,8 @@ def handlePendingMessages(client_pending_socket, proxy):
                     query = f'''CREATE TABLE "{grpName}"(
                             name TEXT,
                             message TEXT,
-                            messageId INT DEFAULT 0);'''
+                            messageId INT DEFAULT 0
+                            symmetricKey TEXT DEFAULT 'NA');'''
                     cur.execute(query)
 
                     # #############################TODO################################ #
@@ -92,7 +98,7 @@ def handlePendingMessages(client_pending_socket, proxy):
                     data['privateKey'][4] = data['privateKey'][4][:-1]
                     
                     query = f'''INSERT INTO connections
-                                VALUES('{data['grpName']}', {int(data['privateKey'][0])}, {int(data['privateKey'][1])}, {int(data['privateKey'][2])}, {int(data['privateKey'][3])}, {int(data['privateKey'][4])}, False)'''
+                                VALUES('{data['grpName']}', {data['privateKey'][0]}, {data['privateKey'][1]}, {data['privateKey'][2]}, {data['privateKey'][3]}, {data['privateKey'][4]}, False)'''
                     cur.execute(query)
                     # return (sender, grpName, decryptedMessage, data['messageId'])
 
@@ -103,6 +109,9 @@ def handlePendingMessages(client_pending_socket, proxy):
                 # storing the data into the table corresponding to the sender
                 # print(type(response))
                 else:
+                    encrypted = message
+                    key = data["fernetKey"]
+                    encrypted, key = replace_quote(encrypted, key)
                     # If table already exists
                     if (response):
                         query = f'''SELECT COALESCE(MAX(messageId), 0) FROM "{grpName}";'''
@@ -110,7 +119,7 @@ def handlePendingMessages(client_pending_socket, proxy):
                         record = cur.fetchall()
                         nextRowNum = record[0][0] + 1
                         query = f'''INSERT INTO "{grpName}"
-                            VALUES('{sender}', '{message}', {nextRowNum})'''
+                            VALUES('{sender}', '{encrypted}', {nextRowNum}, '{key}');'''
                         cur.execute(query)
                         # print(colored(f'{decryptedMessage}', 'white', 'on_red'))
                     if (not response):
@@ -120,7 +129,7 @@ def handlePendingMessages(client_pending_socket, proxy):
                         record = cur.fetchall()
                         nextRowNum = record[0][0] + 1
                         query = f'''INSERT INTO "{sender}"
-                                    VALUES('{sender}', '{message}', {nextRowNum});'''
+                                    VALUES('{sender}', '{encrypted}', {nextRowNum}, '{key}');'''
                         cur.execute(query)
 
                 # #################
@@ -132,6 +141,12 @@ def handlePendingMessages(client_pending_socket, proxy):
             break
     client_pending_socket.close()
 
+def replace_quote(msg, fernet):
+    msg = msg.replace("\'","\'\'")
+    msg = msg.replace("\"","\"\"")
+    fernet = fernet.replace("\'","\'\'")
+    fernet = fernet.replace("\"","\"\"")
+    return msg,fernet
 
 def isAdminOfGroup(grpName, MY_USERNAME):
     """
@@ -169,7 +184,7 @@ def decryptMessage(message, cur, MY_USERNAME):
     cur.execute(query)
     components = cur.fetchall()[0]
     PrivateKey = rsa.key.PrivateKey(
-        components[0], components[1], components[2], components[3], components[4])
+        int(components[0]), int(components[1]), int(components[2]), int(components[3]), int(components[4]))
     # check if has been already decoded or not
     decryptedMessage = rsa.decrypt(message, PrivateKey).decode()
     return decryptedMessage
@@ -224,32 +239,38 @@ def receive_message(data, proxy):
         record = cur.fetchall()
         nextRowNum = record[0][0] + 1
 
+        encrypted = data["imageData"]
+        key = data["fernetKey"]
+        encrypted, key = replace_quote(encrypted, key)
+
         query = f'''INSERT INTO "{grpName}" 
-                    VALUES ('{sender}','{message}', {nextRowNum});'''
+                    VALUES ('{sender}','{message}', {nextRowNum}, '{key}');'''
         cur.execute(query)
         query = f'''INSERT INTO "{grpName}"
-                    VALUES ('{data["imageFormat"]}', '{data["imageData"]}', {nextRowNum + 1});'''
+                    VALUES ('{data["imageFormat"]}', '{encrypted}', {nextRowNum + 1}, '{key}');'''
         cur.execute(query)
-        return (sender, grpName, decryptedMessage, data['messageId'], True, data['imageFormat'], data['imageData'])
+        return (sender, grpName, decryptedMessage, data['messageId'], True, data["fernetKey"], data['isGroup'], data['imageFormat'], data['imageData'])
 
     if message == "ADD_PARTICIPANT":
         cur = connectMydb(MY_USERNAME)
         query = f'''CREATE TABLE "{grpName}"(
                 name TEXT,
                 message TEXT,
-                messageId INT DEFAULT 0);'''
+                messageId INT DEFAULT 0,
+                symmetricKey TEXT DEFAULT 'NA');'''
         cur.execute(query)
 
         # #############################TODO################################ #
         # YOU MUST HAVE TO DECRYPT PRIVATE KEY USING THE PUBLIC KEY OF THIS USER
         # #############################TODO################################ #
 
+        ### In live messaging the private Key is sent as a list
         query = f'''INSERT INTO connections
                     VALUES('{data['grpName']}', {data['privateKey'][0]}, {data['privateKey'][1]}, {data['privateKey'][2]}, {data['privateKey'][3]}, {data['privateKey'][4]}, False)'''
         cur.execute(query)
         ############
         # return True for add participant too as we need to delete 2 rows here too
-        return (sender, grpName, decryptedMessage, data['messageId'], True)
+        return (sender, grpName, decryptedMessage, data['messageId'], True, data["fernetKey"], data['isGroup'])
 
     # if message == "REMOVE_PARTICIPANT":
     # NOT HERE , as we have to let user know that he is removed so drop table only when
@@ -259,13 +280,17 @@ def receive_message(data, proxy):
     # print(type(response))
     else:
         # If table already exists
+        encrypted = message
+        key = data["fernetKey"]
+        encrypted, key = replace_quote(encrypted, key)
+
         if (response):
             query = f'''SELECT COALESCE(MAX(messageId), 0) FROM "{grpName}";'''
             cur.execute(query)
             record = cur.fetchall()
             nextRowNum = record[0][0] + 1
             query = f'''INSERT INTO "{grpName}"
-                VALUES('{sender}', '{message}', {nextRowNum})'''
+                VALUES('{sender}', '{encrypted}', {nextRowNum}, '{key}')'''
             cur.execute(query)
             # print(colored(f'{decryptedMessage}', 'white', 'on_red'))
         if (not response):
@@ -275,11 +300,11 @@ def receive_message(data, proxy):
             record = cur.fetchall()
             nextRowNum = record[0][0] + 1
             query = f'''INSERT INTO "{sender}"
-                        VALUES('{sender}', '{message}', {nextRowNum});'''
+                        VALUES('{sender}', '{encrypted}', {nextRowNum}, '{key}');'''
             cur.execute(query)
         # print(colored(f'{decryptedMessage}', 'white', 'on_red'))
 
-    return (sender, grpName, decryptedMessage, data['messageId'], False)
+    return (sender, grpName, decryptedMessage, data['messageId'], False, data["fernetKey"], data['isGroup'])
 
 
 def checkSocketReady(socket):
@@ -296,6 +321,23 @@ def checkSocketReady(socket):
     else:
         return False
 
+def getOwnPublicKey(sender):
+    cur = connectMydb(sender)
+    query = f'''SELECT publicn ,publice from userinfo
+                WHERE username = '{sender}';'''
+    cur.execute(query)
+    record = cur.fetchall()[0]
+    publicKey = rsa.key.PublicKey(int(record[0]), int(record[1]))
+    return publicKey
+
+def getOwnPrivateKey(sender):
+    cur = connectMydb(sender)
+    query = f'''SELECT publicn ,publice, privated, privatep, privateq from userinfo
+                WHERE username = '{sender}';'''
+    cur.execute(query)
+    record = cur.fetchall()[0]
+    privateKey = rsa.key.PrivateKey(int(record[0]), int(record[1]), int(record[2]), int(record[3]), int(record[4]))
+    return privateKey
 
 def getPublicKey(reciever, sender):
     """
@@ -312,7 +354,7 @@ def getPublicKey(reciever, sender):
     cur.execute(query)
     record = cur.fetchall()[0]
     # print(record)
-    publicKey = rsa.key.PublicKey(record[0], record[1])
+    publicKey = rsa.key.PublicKey(int(record[0]), int(record[1]))
     return publicKey
 
 
@@ -418,13 +460,13 @@ def getAllUsers(MY_USERNAME):
     group = []
 
     cur = connectMydb(MY_USERNAME)
-    query = f'''SELECT username FROM connections WHERE privated = -1;'''
+    query = f'''SELECT username FROM connections WHERE privated = '-1';'''
     cur.execute(query)
     record = cur.fetchall()
     for i in record:
         DM.append(i[0])
 
-    query = f'''SELECT username FROM connections WHERE privated != -1;'''
+    query = f'''SELECT username FROM connections WHERE privated != '-1';'''
     cur.execute(query)
     record = cur.fetchall()
     for i in record:
@@ -453,7 +495,7 @@ def addNewDM(MY_USERNAME, username, proxy):
         # print("HELLO")
         cur = connectMydb(MY_USERNAME)
         query = f'''INSERT INTO connections
-                    VALUES('{username}', {publicKey[0]}, {publicKey[1]}, -1, -1, -1, FALSE);'''
+                    VALUES('{username}', {publicKey[0]}, {publicKey[1]}, '-1', '-1', '-1', FALSE);'''
         cur.execute(query)
 
         query = f'''SELECT EXISTS (
@@ -470,7 +512,8 @@ def addNewDM(MY_USERNAME, username, proxy):
             query = f'''CREATE TABLE "{username}"(
                         person TEXT,
                         message TEXT,
-                        messageId INT DEFAULT 0);'''
+                        messageId INT DEFAULT 0,
+                        symmetricKey TEXT DEFAULT 'NA');'''
             cur.execute(query)
 
     return True
@@ -525,7 +568,7 @@ def createGroup(grpName, ADMIN, proxy):
     """
     cur = connectMydb(ADMIN)
     ###########################
-    publicKey, privateKey = rsa.newkeys(30)
+    publicKey, privateKey = rsa.newkeys(512)
 
     query = f'''INSERT INTO connections
             VALUES('{grpName}',{publicKey['n']}, {publicKey['e']}, {privateKey['d']}, {privateKey['p']}, {privateKey['q']}, TRUE)'''
@@ -537,7 +580,8 @@ def createGroup(grpName, ADMIN, proxy):
     query = f'''CREATE TABLE "{grpName}"(
                 name TEXT,
                 message TEXT,
-                messageId INT DEFAULT 0);'''
+                messageId INT DEFAULT 0,
+                symmetricKey TEXT DEFAULT 'NA');'''
     cur.execute(query)
 
 
@@ -559,7 +603,7 @@ def sendAck(client_socket, messageId, isImage):
 ##########################################
 # Pointer to last read messages so the rest are printed when the user opens the interface
 # Online-Offline status updation and storing-sending messages accordingly
-# Check
 # ENCRYPTION
 # Multi-server load balancing
 ################ TODO ####################
+# Use eval to get the encrypted,message and keys as bytes before decrypting

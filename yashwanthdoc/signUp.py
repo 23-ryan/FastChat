@@ -26,10 +26,10 @@ def handleSignUp(proxy, IP, PORT):
     if (not proxy.checkUserName(userName)):
         password = input("Password: ")
 
-        publickey, privatekey = rsa.newkeys(30)
+        publickey, privatekey = rsa.newkeys(512)
         # print(privatekey)
         # print(privatekey['d'], privatekey['p'], privatekey['q'])
-        proxy.addNewUser(userName, password, publickey['n'], publickey['e'])
+        proxy.addNewUser(userName, password, str(publickey['n']), str(publickey['e']))
         print(colored('USER SUCCESSFULLY REGISTERED !!', 'yellow'))
         client_socket, client_pending_socket = goOnline(userName, IP, PORT)
 
@@ -43,24 +43,24 @@ def handleSignUp(proxy, IP, PORT):
         query = f'''CREATE TABLE userinfo(
                     username TEXT,
                     password TEXT,
-                    publicn BIGINT,
-                    publice BIGINT,
-                    privated BIGINT,
-                    privatep BIGINT,
-                    privateq BIGINT);'''
+                    publicn TEXT,
+                    publice TEXT,
+                    privated TEXT,
+                    privatep TEXT,
+                    privateq TEXT);'''
         cur.execute(query)
 
         query = f'''INSERT INTO userinfo
-                    VALUES ('{userName}', '{password}', {publickey['n']}, {publickey['e']}, {privatekey['d']}, {privatekey['p']}, {privatekey['q']});'''
+                    VALUES ('{userName}', '{password}', {str(publickey['n'])}, {str(publickey['e'])}, {str(privatekey['d'])}, {str(privatekey['p'])}, {str(privatekey['q'])});'''
         cur.execute(query)
 
         query = f'''CREATE TABLE connections(
                     username TEXT,
-                    publicn BIGINT,
-                    publice BIGINT,
-                    privated BIGINT,
-                    privatep BIGINT,
-                    privateq BIGINT,
+                    publicn TEXT,
+                    publice TEXT,
+                    privated TEXT,
+                    privatep TEXT,
+                    privateq TEXT,
                     isAdmin BOOLEAN,
                     readUpto INT DEFAULT 0);'''
         cur.execute(query)

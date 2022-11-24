@@ -6,10 +6,10 @@ import sys
 import rsa
 import json
 import base64
-from client import receive_message, getPublicKey, unpack_message, sendAck
+from client import receive_message, getPublicKey, getPrivateKey, unpack_message, sendAck, getOwnPublicKey, getOwnPrivateKey
 from termcolor import colored
 from client import connectMydb
-
+from cryptography.fernet import Fernet
 
 def handleDM(MY_USERNAME, OTHER_USERNAME, client_socket, proxy, isGroup):
     """To be used when MY_USERNAME sends a message to OTHER_USERNAME.
@@ -38,12 +38,29 @@ def handleDM(MY_USERNAME, OTHER_USERNAME, client_socket, proxy, isGroup):
     finalMessageId = 0
     for rec in record:
         if (isImage):
+
+            fernetKey = rec[3]
+            encryptedMessage = rec[1]
+            fernetKey = fernetKey.replace("\'\'","\'")
+            fernetKey = fernetKey.replace("\"\"","\"")
+            encryptedMessage = encryptedMessage.replace("\'\'","\'")
+            encryptedMessage = encryptedMessage.replace("\"\"","\"")
+
+            if(not isGroup):
+                symmetricKey = rsa.decrypt(eval(fernetKey), getOwnPrivateKey(MY_USERNAME))
+            else:
+                private = getPrivateKey(OTHER_USERNAME, MY_USERNAME)
+                privateKey = rsa.key.PrivateKey(int(private[0]),int(private[1]),int(private[2]),int(private[3]),int(private[4]))
+                symmetricKey = rsa.decrypt(eval(fernetKey), privateKey)  
+            fernetObj = Fernet(symmetricKey)
+            decryptedMessage = fernetObj.decrypt(eval(encryptedMessage)).decode('utf-8')
+
             ans = input("DO YOU WANT TO RECIEVE AN IMAGE SENT(YES/NO ?):")
             if (ans.upper() == "YES"):
                 name = input("SAVE IMAGE AS: ")
                 os.system(f'touch {name}.{rec[0]}')
                 with open(f'{name}.{rec[0]}', 'wb') as f:
-                    f.write(base64.b64decode(rec[1]))
+                    f.write(base64.b64decode(decryptedMessage))
                     print(colored('RECEIVED IMAGE!!', 'green'))
             isImage = False
 
@@ -58,7 +75,23 @@ def handleDM(MY_USERNAME, OTHER_USERNAME, client_socket, proxy, isGroup):
             print(colored("YOU WERE KICKED FROM THE GROUP!", 'yellow'))
 
         else:
-            print(f"{rec[0]} > ", colored(f'{rec[1]}', 'white', 'on_red'))
+            fernetKey = rec[3]
+            encryptedMessage = rec[1]
+            fernetKey = fernetKey.replace("\'\'","\'")
+            fernetKey = fernetKey.replace("\"\"","\"")
+            encryptedMessage = encryptedMessage.replace("\'\'","\'")
+            encryptedMessage = encryptedMessage.replace("\"\"","\"")
+
+            if(not isGroup):
+                symmetricKey = rsa.decrypt(eval(fernetKey), getOwnPrivateKey(MY_USERNAME))
+            else:
+                private = getPrivateKey(OTHER_USERNAME, MY_USERNAME)
+                privateKey = rsa.key.PrivateKey(int(private[0]),int(private[1]),int(private[2]),int(private[3]),int(private[4]))
+                symmetricKey = rsa.decrypt(eval(fernetKey), privateKey)  
+            fernetObj = Fernet(symmetricKey)
+            decryptedMessage = fernetObj.decrypt(eval(encryptedMessage)).decode('utf-8')
+
+            print(f"{rec[0]} > ", colored(f'{decryptedMessage}', 'white', 'on_red'))
 
         finalMessageId = rec[2]
 
@@ -89,19 +122,55 @@ def handleDM(MY_USERNAME, OTHER_USERNAME, client_socket, proxy, isGroup):
                         print(colored("YOU WERE KICKED FROM THE GROUP!", 'yellow'))
                     # DON'T PRINT THE MESSAGE OF OTHER USER IN ONE'S TERMINAL
 
+                    ##### YET TO HANDLE THE CASE WHEN IN A GROUP AS THEN DECRYPT 
+                    ##### WITH GROUPS OWN PRIVATE KEY
+
                     elif (data and data[1] == OTHER_USERNAME and data[2] == "SEND IMAGE"):
+                        fernetKey = data[5]
+                        encryptedMessage = data[8]
+                        fernetKey = fernetKey.replace("\'\'","\'")
+                        fernetKey = fernetKey.replace("\"\"","\"")
+                        encryptedMessage = encryptedMessage.replace("\'\'","\'")
+                        encryptedMessage = encryptedMessage.replace("\"\"","\"")
+
+                        if(not isGroup):
+                            symmetricKey = rsa.decrypt(eval(fernetKey), getOwnPrivateKey(MY_USERNAME))
+                        else:
+                            private = getPrivateKey(OTHER_USERNAME, MY_USERNAME)
+                            privateKey = rsa.key.PrivateKey(int(private[0]),int(private[1]),int(private[2]),int(private[3]),int(private[4]))
+                            symmetricKey = rsa.decrypt(eval(fernetKey), privateKey)
+                            ## If group then decrypt by its private key
+                        fernetObj = Fernet(symmetricKey)
+                        decryptedMessage = fernetObj.decrypt(eval(encryptedMessage)).decode('utf-8') 
                         ans = input(
                             "DO YOU WANT TO RECIEVE AN IMAGE SENT(YES/NO ?):")
                         if (ans.upper() == "YES"):
                             name = input("SAVE IMAGE AS: ")
-                            os.system(f'touch {name}.{data[5]}')
-                            with open(f'{name}.{data[5]}', 'wb') as f:
-                                f.write(base64.b64decode(data[6]))
+                            os.system(f'touch {name}.{data[7]}')
+                            with open(f'{name}.{data[7]}', 'wb') as f:
+                                f.write(base64.b64decode(decryptedMessage))
                                 print('recieved Image')
 
                     elif (data and data[1] == OTHER_USERNAME):
+                        fernetKey = data[5]
+                        encryptedMessage = data[2]
+                        fernetKey = fernetKey.replace("\'\'","\'")
+                        fernetKey = fernetKey.replace("\"\"","\"")
+                        encryptedMessage = encryptedMessage.replace("\'\'","\'")
+                        encryptedMessage = encryptedMessage.replace("\"\"","\"")
+                        print(fernetKey)
+
+                        if(not isGroup):
+                            symmetricKey = rsa.decrypt(eval(fernetKey), getOwnPrivateKey(MY_USERNAME))
+                        else:
+                            private = getPrivateKey(OTHER_USERNAME, MY_USERNAME)
+                            privateKey = rsa.key.PrivateKey(int(private[0]),int(private[1]),int(private[2]),int(private[3]),int(private[4]))
+                            symmetricKey = rsa.decrypt(eval(fernetKey), privateKey)
+                        fernetObj = Fernet(symmetricKey)
+                        decryptedMessage = fernetObj.decrypt(eval(encryptedMessage)).decode('utf-8') 
+
                         print(f"{data[0]} > ", colored(
-                            f'{data[2]}', 'white', 'on_red'))
+                            f'{decryptedMessage}', 'white', 'on_red'))
 
                     query = f'''SELECT MAX(messageId) FROM "{OTHER_USERNAME}";'''
                     cur.execute(query)
@@ -128,8 +197,15 @@ def handleDM(MY_USERNAME, OTHER_USERNAME, client_socket, proxy, isGroup):
                         img_json = ""
                         if (path != ""):
                             with open(path, 'rb') as f:
-                                img_json = {'userMessage': f"{message}", 'sender': f"{MY_USERNAME}", 'receiver': f"{OTHER_USERNAME}",
-                                            'imageFormat': f"{path.split('.')[-1]}", 'imageData': f"{base64.encodebytes(f.read()).decode('utf-8')}", 'isGroup': isGroup, 'isAck': False}
+                                ######### ENCRYPT imageData here only ##########
+                                symmetricKey = Fernet.generate_key()
+                                fernetObj = Fernet(symmetricKey)
+                                imgEncrypted = fernetObj.encrypt(base64.encodebytes(f.read()).decode('utf-8').encode('utf-8'))
+                                publicKey = getPublicKey(OTHER_USERNAME, MY_USERNAME)
+                                encrypted_key = rsa.encrypt(symmetricKey, publicKey)
+                                ######### ENCRYPT FERNET KEY USING THE rsa key ########
+                                img_json = {'userMessage': f"{message}", 'sender': f"{MY_USERNAME}", 'receiver': f"{OTHER_USERNAME}", 'fernetKey': f"{encrypted_key}",
+                                            'imageFormat': f"{path.split('.')[-1]}", 'imageData': f"{imgEncrypted}", 'isGroup': isGroup, 'isAck': False}
                                 print("Image sent")
                             jsonData = json.dumps(img_json)
                             client_socket.send(
@@ -140,44 +216,74 @@ def handleDM(MY_USERNAME, OTHER_USERNAME, client_socket, proxy, isGroup):
                             record = cur.fetchall()
                             nextRowNum = record[0][0] + 1
 
+                            encrypt_for_me = rsa.encrypt(symmetricKey, getOwnPublicKey(MY_USERNAME))
+
+                            encrypted_message = str(imgEncrypted)
+                            encrypted_message = encrypted_message.replace("\'","\'\'")
+                            encrypted_message = encrypted_message.replace("\"","\"\"")
+                            
+                            encrypted_key = str(encrypted_key)
+                            encrypted_key = encrypted_key.replace("\'","\'\'")
+                            encrypted_key = encrypted_key.replace("\"","\"\"")
+
+                            encrypt_for_me = str(encrypt_for_me)
+                            encrypt_for_me = encrypt_for_me.replace("\'","\'\'")
+                            encrypt_for_me = encrypt_for_me.replace("\"","\"\"")
+
                             query = f'''INSERT INTO "{OTHER_USERNAME}" 
-                                        VALUES ('{MY_USERNAME}','{message}', {nextRowNum});'''
+                                        VALUES ('{MY_USERNAME}','{message}', {nextRowNum}, '{encrypt_for_me}');'''
                             cur.execute(query)
                             query = f'''INSERT INTO "{OTHER_USERNAME}"
-                                        VALUES ('{img_json["imageFormat"]}', '{img_json["imageData"]}', {nextRowNum + 1});'''
+                                        VALUES ('{img_json["imageFormat"]}', '{encrypted_message}', {nextRowNum + 1}, '{encrypt_for_me}');'''
                             cur.execute(query)
 
                             query = f'''UPDATE connections SET readUpto = {nextRowNum + 1} WHERE username = '{OTHER_USERNAME}';'''
                             cur.execute(query)
 
                     elif message != "":
-                        # print("HERE")
+                        symmetricKey = Fernet.generate_key()
+                        fernetObj = Fernet(symmetricKey)
                         publicKey = getPublicKey(OTHER_USERNAME, MY_USERNAME)
-                        # print(publicKey)
-                        # print(type(message))
-                        # message = rsa.encrypt(message.encode('utf-8'),publicKey)
-                        # print(message)
-
+                        encrypted_message = fernetObj.encrypt(message.encode('utf-8'))
+                        encrypted_key = rsa.encrypt(symmetricKey, publicKey)
+                        print(encrypted_key)
+                        encrypt_for_me = rsa.encrypt(symmetricKey, getOwnPublicKey(MY_USERNAME))
                         # INSERT data into the table
+
                         cur = connectMydb(MY_USERNAME)
                         query = f'''SELECT COALESCE(MAX(messageId),0) FROM "{OTHER_USERNAME}";'''
                         cur.execute(query)
                         maxId = cur.fetchall()[0][0] + 1
 
-                        # 
+                        # encrypted is of form b'' so enclose in double quotes
+                        
+                        #######3 replacing a quote by 2 makes it escape hence complete ould be identified by postgres as string
+                        
+                        # Encode message to bytes, prepare header and convert to bytes, like for username above, then send
+                        jsonData = json.dumps({'userMessage': f"{encrypted_message}", 'sender': f"{MY_USERNAME}", 'fernetKey': f"{encrypted_key}",
+                                              'receiver': f"{OTHER_USERNAME}", 'isGroup': isGroup, 'isAck': False})
+                        client_socket.send(
+                            bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
+
+                        encrypted_message = str(encrypted_message)
+                        encrypted_message = encrypted_message.replace("\'","\'\'")
+                        encrypted_message = encrypted_message.replace("\"","\"\"")
+                        
+                        encrypted_key = str(encrypted_key)
+                        encrypted_key = encrypted_key.replace("\'","\'\'")
+                        encrypted_key = encrypted_key.replace("\"","\"\"")
+
+                        encrypt_for_me = str(encrypt_for_me)
+                        encrypt_for_me = encrypt_for_me.replace("\'","\'\'")
+                        encrypt_for_me = encrypt_for_me.replace("\"","\"\"")
+
                         query = f'''INSERT INTO "{OTHER_USERNAME}"
-                                    VALUES('{MY_USERNAME}', '{message}', {maxId});'''
+                                    VALUES('{MY_USERNAME}', '{encrypted_message}', {maxId}, '{encrypt_for_me}');'''
                         cur.execute(query)
 
                         # 
                         query = f'''UPDATE connections SET readUpto = {maxId} WHERE username = '{OTHER_USERNAME}';'''
                         cur.execute(query)
-                        
-                        # Encode message to bytes, prepare header and convert to bytes, like for username above, then send
-                        jsonData = json.dumps({'userMessage': f"{message}", 'sender': f"{MY_USERNAME}",
-                                              'receiver': f"{OTHER_USERNAME}", 'isGroup': isGroup, 'isAck': False})
-                        client_socket.send(
-                            bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
 
         except IOError as e:
             # This is normal on non blocking connections - when there are no incoming data, error is going to be raised

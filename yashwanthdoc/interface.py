@@ -133,7 +133,7 @@ if __name__ == '__main__':
                                 if (not proxy.addUserToGroup(grpName, newuser)):
                                     # SENDING KEYWORD TO ADD THE GROUP TO THE NEW USER SIDE
                                     message = "ADD_PARTICIPANT"
-                                    jsonData = json.dumps({'userMessage': f"{message}", 'sender': f"{MY_USERNAME}", 'receiver': f"{newuser}",
+                                    jsonData = json.dumps({'userMessage': f"{message}", 'sender': f"{MY_USERNAME}", 'receiver': f"{newuser}", 'fernetKey': 'NA',
                                                            'grpName': f"{grpName}", 'privateKey': getPrivateKey(grpName, MY_USERNAME), 'isGroup': False, 'isAck': False})
                                     client_socket.send(
                                         bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
@@ -206,7 +206,7 @@ if __name__ == '__main__':
                             removeuser = input("PARTICIPANT TO BE REMOVED: ")
                             if (proxy.removeUserFromGroup(grpName, removeuser)):
                                 message = "REMOVE_PARTICIPANT"
-                                jsonData = json.dumps({'userMessage': f"{message}", 'sender': f"{MY_USERNAME}",
+                                jsonData = json.dumps({'userMessage': f"{message}", 'sender': f"{MY_USERNAME}", 'fernetKey': 'NA',
                                                        'receiver': f"{removeuser}", 'grpName': f"{grpName}", 'isGroup': False})
                                 client_socket.send(
                                     bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))

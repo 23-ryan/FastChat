@@ -266,7 +266,13 @@ def initialize():
 
 
 def receiveAck(client_socket):
+    """Receive an acknowledgement from the client on receipt of a message over socket
 
+    :param [client_socket]: the socket that is sending the ack
+    :type [client_socket]: socket
+    :return: whether the acknowledgement received is meaningful (True) or not (False)
+    :rtype: bool
+    """
     data = unpack_message(client_socket)
 
     # handling exception of keyboard interrupt as in that case unpack message would return
@@ -280,7 +286,14 @@ def receiveAck(client_socket):
 
 
 def sendPendingMessages(client_socket, receiverName):
-    print("hlhls")
+    """Send pending messages to reveiverName whenever he/she logs in, over client_socket
+
+    :param [client_socket]: the socket that is sending the pending messages
+    :type [client_socket]: socket
+    :param [receiverName]: username of the reeceiver
+    :type [receiverName]: str
+    """
+    # print("hlhls")
     # receiverName = clients[client_socket]
     cur = connectToDb()
     query = f'''SELECT EXISTS(SELECT * FROM pending WHERE receiver = '{receiverName}');'''
@@ -413,6 +426,15 @@ def updatestatus(isOnline, username):
     cur.execute(query)
 
 def replace_quote(msg, fernet):
+    """Duplicate all occurences of both double and single quotes
+
+    :param [msg]: message string
+    :type [msg]: str
+    :param [fernet]: fernet string
+    :type [fernet]: str
+    :return: return the string with duplicated quotes
+    :rtype: str,str
+    """
     msg = msg.replace("\'","\'\'")
     msg = msg.replace("\"","\"\"")
     fernet = fernet.replace("\'","\'\'")
@@ -554,6 +576,14 @@ if __name__ == '__main__':
                             cur.execute(query)
 
                             # message['privateKey'] = [str(i) for i in message['privateKey']]
+                        elif (message['userMessage'] == "REMOVE_PARTICIPANT"):
+                            fernet = message['fernetKey']
+                            encrypted = message['userMessage']
+
+                            query = f'''INSERT INTO pending
+                                            VALUES({nextRowNum}, '{message['sender']}', '{message['receiver']}', '{message['grpName']}', '{encrypted}', '{fernet}');'''
+                            cur.execute(query)
+
                         else:
                             fernet = message['fernetKey']
                             encrypted = message['userMessage']
@@ -561,7 +591,7 @@ if __name__ == '__main__':
                            
 
                             query = f'''INSERT INTO pending
-                                            VALUES({nextRowNum}, '{message['sender']}', '{message['receiver']}', '{message['grpName']}', '{encrypted}', '{fernet}');'''
+                                            VALUES({nextRowNum}, '{message['sender']}', '{message['receiver']}', '', '{encrypted}', '{fernet}');'''
                             cur.execute(query)
 
                     else:
@@ -597,13 +627,21 @@ if __name__ == '__main__':
                                             VALUES({nextRowNum+1}, '{message['sender']}', '{message['receiver']}', '{message['grpName']}', '{message['privateKey']}');'''
                             cur.execute(query)
                         # print(nextRowNum)
+                        elif (message['userMessage'] == "REMOVE_PARTICIPANT"):
+                            fernet = message['fernetKey']
+                            encrypted = message['userMessage']
+
+                            query = f'''INSERT INTO pending
+                                            VALUES({nextRowNum}, '{message['sender']}', '{message['receiver']}', '{message['grpName']}', '{encrypted}', '{fernet}');'''
+                            cur.execute(query)
+
                         else:
                             fernet = message['fernetKey']
                             encrypted = message['userMessage']
                             encrypted, fernet = replace_quote(encrypted,fernet)
 
                             query = f'''INSERT INTO pending
-                                            VALUES({nextRowNum}, '{message['sender']}', '{message['receiver']}', '{message['grpName']}', '{encrypted}', '{fernet}');'''
+                                            VALUES({nextRowNum}, '{message['sender']}', '{message['receiver']}', '', '{encrypted}', '{fernet}');'''
                             cur.execute(query)
 
                         jsonData = json.dumps(message)

@@ -1,0 +1,9 @@
+# ADD NEW USER
+for i in {1..2}; do python3 -c "let=chr(96 + $i); print(f'2\n{let}\n{let}{let}\n6\n')" | python3 interface.py localhost 5000; done
+
+# SIGN IN
+for i in {1..2}; do python3 -c "let=chr(96 + $i); print(f'1\n{let}\n{let}{let}\n1\n{(let+1)%2}6\n')" | python3 interface.py localhost 5000; done
+
+
+
+

@@ -18,6 +18,13 @@ The first HEADER_LENGTH characters of the initial message inform the listener ho
 
 
 def handlePendingMessages(client_pending_socket, proxy):
+    """Handles the sending of pending messages. Called every time the client logs in.
+
+    :param [client_pending_socket]: socket belonging to the client having pending messages
+    :type [client_pending_socket]: socket
+    :param [proxy]: proxy server for rpc
+    :type [proxy]: ServerProxy
+    """
     while True:
         bo = False
         read_sockets, _, error_sockets = select.select(
@@ -143,6 +150,15 @@ def handlePendingMessages(client_pending_socket, proxy):
     client_pending_socket.close()
 
 def replace_quote(msg, fernet):
+    """Duplicate all occurences of both double and single quotes
+
+    :param [msg]: message string
+    :type [msg]: str
+    :param [fernet]: fernet string
+    :type [fernet]: str
+    :return: return the string with duplicated quotes
+    :rtype: str,str
+    """
     msg = msg.replace("\'","\'\'")
     msg = msg.replace("\"","\"\"")
     fernet = fernet.replace("\'","\'\'")
@@ -151,10 +167,10 @@ def replace_quote(msg, fernet):
 
 def isAdminOfGroup(grpName, MY_USERNAME):
     """
-
+    :param [grpName]: name of the group
     :type [grpName]: str
+    :param [MY_USERNAME]: admin username
     :type [MY_USERNAME]: str
-    :type [data]: int
     :return: whether MY_USERNAME is an admin of grpName
     :rtype: bool
     """
@@ -176,7 +192,6 @@ def decryptMessage(message, cur, MY_USERNAME):
     :type [cur]: _Cursor
     :param [MY_USERNAME]: username of the client in question
     :type [MY_USERNAME]: str
-
     :return: the decrypted message
     :rtype: str
     """
@@ -323,6 +338,13 @@ def checkSocketReady(socket):
         return False
 
 def getOwnPublicKey(sender):
+    """Get the sender's public key from local database
+
+    :param [sender]: username of the sender
+    :type [sender]: str
+    :return: sender's public key
+    :rtype: rsa.key.PublicKey
+    """
     cur = connectMydb(sender)
     query = f'''SELECT publicn ,publice from userinfo
                 WHERE username = '{sender}';'''
@@ -332,6 +354,13 @@ def getOwnPublicKey(sender):
     return publicKey
 
 def getOwnPrivateKey(sender):
+    """Get the sender's private key from local database
+
+    :param [sender]: username of the sender
+    :type [sender]: str
+    :return: sender's private key
+    :rtype: rsa.key.PrivateKey
+    """
     cur = connectMydb(sender)
     query = f'''SELECT publicn ,publice, privated, privatep, privateq from userinfo
                 WHERE username = '{sender}';'''
@@ -600,6 +629,15 @@ def createGroup(grpName, ADMIN, proxy):
 
 
 def sendAck(client_socket, messageId, isImage):
+    """Send an acknowledgement to the server on receipt of a message over socket
+
+    :param [client_socket]: the socket that is sending the ack
+    :type [client_socket]: socket
+    :param [messageId]: unique id used to identify the message
+    :type [messageId]: int
+    :param [isImage]: whether the message is an image or not
+    :type [isImage]: bool
+    """
     message = "__ACK__"
     jsonData = json.dumps({'userMessage': f"{message}",
                           'messageId': f"{messageId}", 'isAck': True, 'isImage': isImage})

@@ -6,7 +6,9 @@ import random
 import threading
 from server import *
 import time
+import random
 import os
+import subprocess
 # dumb netcat server, short tcp connection
 # $ ~  while true ; do nc -l 8888 < server1.html; done
 # $ ~  while true ; do nc -l 9999 < server2.html; done
@@ -31,9 +33,32 @@ import os
 
 #     def addClient(self, client_socket):
 #         self.client_sockets_list.append(client_socket)
+roundRobin = 0
+algorithm = ""
+
+pid_serverId = dict()
+
+def assignPid():
+    for i in range(1, 4):
+        cmd = ''' ps aux | grep "server.py localhost ''' +f'''{(PORT + i*100)}'''+ '''" | head -1 | awk '{print $2}' '''
+        id = subprocess.check_output(cmd, shell=True, universal_newlines=True).strip()
+        pid_serverId[id] = i-1
+
+def strategy(algorithm):
+    global roundRobin
+    if(algorithm == 'round-robin'):
+        a, b  = roundRobin , (PORT + (roundRobin)*100)
+        roundRobin = (roundRobin+1)%3
+        print(a, b)
+        return a, b
+    if(algorithm == 'random'):
+        a = random.randint(0, 2)
+        print(a, PORT + a*100)
+        return (a, PORT + a*100)
+
 
 def getFreeServerId():
-    return 0, 5100
+    return strategy(algorithm)
 
 def runServer(IP, PORT):
     os.system(f'python3 server.py {IP} {PORT}')
@@ -98,7 +123,10 @@ if __name__ == '__main__':
         initialize()
 
         loadBal = LoadBalancer(f'{IP}', PORT, 'random')
+        algorithm = loadBal.algorithm
         print(colored("Starting Load Balancer....", 'yellow'))
+        assignPid()
+        print(pid_serverId)
         # loadBal.startServers()
         time.sleep(1)
     except KeyboardInterrupt:

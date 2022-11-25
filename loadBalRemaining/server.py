@@ -261,8 +261,27 @@ def initialize():
                             receiver TEXT,
                             grpName TEXT,
                             message TEXT,
-                            symmetricKey TEXT);'''
+                            symmetricKey TEXT,
+                            timestamp timestamp NOT NULL DEFAULT NOW());'''
                 cur.execute(query)
+
+            query = '''DROP FUNCTION IF EXISTS pending_delete_old_rows();'''
+            cur.execute(query)
+
+            query = '''CREATE FUNCTION pending_delete_old_rows() RETURNS trigger
+                            LANGUAGE plpgsql
+                            AS $$
+                        BEGIN
+                        DELETE FROM pending WHERE timestamp < NOW() - INTERVAL '7 DAYS';
+                        RETURN NEW;
+                        END;
+                        $$;'''
+            cur.execute(query)
+
+            query = '''CREATE TRIGGER pending_delete_old_rows_trigger
+                        AFTER INSERT ON pending
+                        EXECUTE PROCEDURE pending_delete_old_rows();'''
+            cur.execute(query)
 
 
 def receiveAck(client_socket):

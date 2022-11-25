@@ -11,7 +11,7 @@ import select
 import sys
 import json
 
-RPC_PORT = 4000
+RPC_PORT = int(sys.argv[3])
 """
 The port of the RPC server.
 """  # pylint: disable=W0105

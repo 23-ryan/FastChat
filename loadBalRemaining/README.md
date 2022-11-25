@@ -24,8 +24,8 @@
 
 ### Running Instructions
 
-On server system: python3 server.py IP PORT
-On client side: python3 interface.py IP PORT
+On server system: python3 server.py IP PORT, python3 loadBalancer.py IP PORT NUM_SERVERS RPC_PORT
+On client side: python3 interface.py IP PORT RPC_PORT
 
 ### Resources
 

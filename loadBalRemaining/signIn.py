@@ -1,4 +1,3 @@
-import rsa
 # from server import addNewUser,isValidPassword, checkUserName
 from termcolor import colored
 from client import goOnline
@@ -28,5 +27,6 @@ def handleSignIn(proxy, IP, PORT):
             f.write(password)
         if (proxy.isValidPassword(userName, password)):
             print(colored("LOGIN SUCCESSFUL!!", 'yellow'))
-            client_sockets, client_pending_sockets = goOnline(userName, IP, PORT)
+            client_sockets, client_pending_sockets = goOnline(
+                userName, IP, PORT)
         return userName, client_sockets, client_pending_sockets

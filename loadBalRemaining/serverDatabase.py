@@ -1,8 +1,5 @@
 import psycopg2
-from datetime import datetime
-import os
-import sys
-
+from server import IP
 serverDbName = "fastchat"
 
 
@@ -13,7 +10,7 @@ def connectToDb():
     :rtype: _Cursor
     """
     conn = psycopg2.connect(database=f"{serverDbName}", user="postgres",
-                            password="fastchat", host="localhost", port="5432")
+                            password="fastchat", host=IP, port="5432")
     conn.autocommit = True
     cur = conn.cursor()
     return cur

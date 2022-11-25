@@ -7,19 +7,18 @@
 # Exception being raised on second time login , i.e if first incorrect and second correct then
 #################################
 
-from base64 import decode
 import socket
 import select
 import json
 import sys
 
-from termcolor import colored
 from serverDatabase import connectToDb
 from json.decoder import JSONDecodeError
 
-import xmlrpc.server as SimpleThreadedXMLRPCServer
 import threading
 import threading
+
+HEADER_LENGTH = 10
 
 
 def getPublicKey(username):
@@ -463,8 +462,6 @@ def replace_quote(msg, fernet):
 
 
 if __name__ == '__main__':
-
-    HEADER_LENGTH = 10
 
     IP = sys.argv[1]
     PORT = int(sys.argv[2])

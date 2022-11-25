@@ -7,6 +7,10 @@ import time
 import random
 import os
 import subprocess
+
+NUM_SERVERS = int(sys.argv[3])
+RPC_PORT = int(sys.argv[4])
+
 # dumb netcat server, short tcp connection
 # $ ~  while true ; do nc -l 8888 < server1.html; done
 # $ ~  while true ; do nc -l 9999 < server2.html; done
@@ -157,7 +161,7 @@ class LoadBalancer(object):
         self.ip = ip
         self.port = PORT
         self.algorithm = algorithm
-        self.numservers = 3
+        self.numservers = NUM_SERVERS
 
     def startServers(self):
         """Start each server on a separate thread
@@ -180,7 +184,7 @@ class ServerThread(threading.Thread):
         """
         threading.Thread.__init__(self)
         self.server = SimpleThreadedXMLRPCServer.SimpleXMLRPCServer(
-            (IP, 4000), logRequests=False, allow_none=True)
+            (IP, RPC_PORT), logRequests=False, allow_none=True)
         self.server.register_function(
             isValidPassword)  # just return a string
         self.server.register_function(addNewUser)

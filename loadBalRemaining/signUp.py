@@ -1,5 +1,4 @@
 import rsa
-import psycopg2
 from termcolor import colored
 from client import connectMydb
 from client import goOnline
@@ -29,7 +28,8 @@ def handleSignUp(proxy, IP, PORT):
         publickey, privatekey = rsa.newkeys(512)
         # print(privatekey)
         # print(privatekey['d'], privatekey['p'], privatekey['q'])
-        proxy.addNewUser(userName, password, str(publickey['n']), str(publickey['e']))
+        proxy.addNewUser(userName, password, str(
+            publickey['n']), str(publickey['e']))
         print(colored('USER SUCCESSFULLY REGISTERED !!', 'yellow'))
         client_sockets, client_pending_sockets = goOnline(userName, IP, PORT)
 

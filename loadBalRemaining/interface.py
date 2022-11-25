@@ -2,7 +2,6 @@
 from signIn import handleSignIn
 from signUp import handleSignUp
 from termcolor import colored
-from client import checkSocketReady
 from client import addNewDM, getAllUsers, isInConnections
 from DM import handleDM
 # from handleGroup import handleGroup
@@ -11,7 +10,6 @@ import xmlrpc.client as cl
 import select
 import sys
 import json
-import socket
 
 RPC_PORT = 4000
 """
@@ -72,7 +70,7 @@ if __name__ == '__main__':
     # As happens in the whatsapp webapp
     print(colored("FETCHING PENDING MESSAGES... ", 'yellow'))
     serverId, port = proxy.getFreeServerId()
-    print("hello")
+    print(colored("CONNECTED TO PROXY SERVER", 'yellow'))
     handlePendingMessages(client_pending_sockets[serverId], proxy)
     print(colored("UP TO DATE!", 'green'))
 
@@ -212,8 +210,8 @@ if __name__ == '__main__':
                             if (proxy.removeUserFromGroup(grpName, removeuser)):
                                 message = "REMOVE_PARTICIPANT"
                                 jsonData = json.dumps({'userMessage': f"{message}", 'sender': f"{MY_USERNAME}", 'fernetKey': 'NA',
-                                                       'receiver': f"{removeuser}", 'grpName': f"{grpName}", 'isGroup': False, 'isAck':False})
-                                
+                                                       'receiver': f"{removeuser}", 'grpName': f"{grpName}", 'isGroup': False, 'isAck': False})
+
                                 serverId, port = proxy.getFreeServerId()
                                 client_sockets[serverId].send(
                                     bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))

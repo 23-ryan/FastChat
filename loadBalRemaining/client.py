@@ -1,14 +1,10 @@
-import os
 import socket
 import select
-import errno
-import sys
 import json
-import base64
 from json.decoder import JSONDecodeError
-from termcolor import colored
 import psycopg2
 import rsa
+from datetime import datetime
 
 HEADER_LENGTH = 10
 """
@@ -101,10 +97,9 @@ def handlePendingMessages(client_pending_socket, proxy):
                     # YOU MUST HAVE TO DECRYPT PRIVATE KEY USING THE PUBLIC KEY OF THIS USER
                     # #############################TODO################################ #
 
-                    #### privaet key list is being passed as a string here so handle that issue
+                    # privaet key list is being passed as a string here so handle that issue
                     data['privateKey'] = eval(data['privateKey'])
-                
-                    
+
                     query = f'''INSERT INTO connections
                                 VALUES('{data['grpName']}', {data['privateKey'][0]}, {data['privateKey'][1]}, {data['privateKey'][2]}, {data['privateKey'][3]}, {data['privateKey'][4]}, False)'''
                     cur.execute(query)
@@ -149,6 +144,7 @@ def handlePendingMessages(client_pending_socket, proxy):
             break
     client_pending_socket.close()
 
+
 def replace_quote(msg, fernet):
     """Duplicate all occurences of both double and single quotes
 
@@ -159,11 +155,12 @@ def replace_quote(msg, fernet):
     :return: return the string with duplicated quotes
     :rtype: str,str
     """
-    msg = msg.replace("\'","\'\'")
-    msg = msg.replace("\"","\"\"")
-    fernet = fernet.replace("\'","\'\'")
-    fernet = fernet.replace("\"","\"\"")
-    return msg,fernet
+    msg = msg.replace("\'", "\'\'")
+    msg = msg.replace("\"", "\"\"")
+    fernet = fernet.replace("\'", "\'\'")
+    fernet = fernet.replace("\"", "\"\"")
+    return msg, fernet
+
 
 def isAdminOfGroup(grpName, MY_USERNAME):
     """
@@ -222,13 +219,16 @@ def receive_message(data, proxy):
     sender = data['sender']
     MY_USERNAME = data['receiver']
     message = data['userMessage']
+
+    logfile = open(f"received_logs.txt", "w")
+    logfile.write(datetime.now().strftime("%H:%M:%S")+"\n")
     # When message in a group is received the sender would be the person swending it ,
     # while according to the implementation we need to enter in table of sender/grpName
     grpName = sender
     if (data['isGroup']):
         grpName = data['grpName']
     if (not data['isGroup']):
-        ### Message sent only to this person so isGroup false but grpName diff. from sender
+        # Message sent only to this person so isGroup false but grpName diff. from sender
         if (message == "REMOVE_PARTICIPANT" or message == "ADD_PARTICIPANT"):
             grpName = data['grpName']
 
@@ -280,7 +280,7 @@ def receive_message(data, proxy):
         # YOU MUST HAVE TO DECRYPT PRIVATE KEY USING THE PUBLIC KEY OF THIS USER
         # #############################TODO################################ #
 
-        ### In live messaging the private Key is sent as a list
+        # In live messaging the private Key is sent as a list
         query = f'''INSERT INTO connections
                     VALUES('{data['grpName']}', {data['privateKey'][0]}, {data['privateKey'][1]}, {data['privateKey'][2]}, {data['privateKey'][3]}, {data['privateKey'][4]}, False)'''
         cur.execute(query)
@@ -337,6 +337,7 @@ def checkSocketReady(socket):
     else:
         return False
 
+
 def getOwnPublicKey(sender):
     """Get the sender's public key from local database
 
@@ -353,6 +354,7 @@ def getOwnPublicKey(sender):
     publicKey = rsa.key.PublicKey(int(record[0]), int(record[1]))
     return publicKey
 
+
 def getOwnPrivateKey(sender):
     """Get the sender's private key from local database
 
@@ -366,8 +368,10 @@ def getOwnPrivateKey(sender):
                 WHERE username = '{sender}';'''
     cur.execute(query)
     record = cur.fetchall()[0]
-    privateKey = rsa.key.PrivateKey(int(record[0]), int(record[1]), int(record[2]), int(record[3]), int(record[4]))
+    privateKey = rsa.key.PrivateKey(int(record[0]), int(
+        record[1]), int(record[2]), int(record[3]), int(record[4]))
     return privateKey
+
 
 def getPublicKey(reciever, sender):
     """
@@ -439,14 +443,13 @@ def goOnline(username, IP, PORT):
         client_socket.send(
             bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
 
-
-
-        client_pending_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_pending_socket = socket.socket(
+            socket.AF_INET, socket.SOCK_STREAM)
         client_pending_socket.setblocking(True)
         client_pending_socket.connect((IP, PORT + 100*i))
 
         dataPen = {'userHeader': f"{username_header}",
-                'userMessage': f"{username}", 'isPending': True}
+                   'userMessage': f"{username}", 'isPending': True}
         jsonDataPen = json.dumps(dataPen)
 
         client_pending_socket.send(

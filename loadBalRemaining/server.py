@@ -335,17 +335,16 @@ def sendPendingMessages(client_socket, receiverName):
 
         rec = list(rec)
 
-
         if (isImg):
 
             temp1 = rec[4]
-            temp1 = temp1.replace("\'\'","\'")
-            temp1 = temp1.replace("\"\"","\"")
+            temp1 = temp1.replace("\'\'", "\'")
+            temp1 = temp1.replace("\"\"", "\"")
             rec[4] = temp1
 
             temp2 = rec[5]
-            temp2 = temp2.replace("\'\'","\'")
-            temp2 = temp2.replace("\"\"","\"")
+            temp2 = temp2.replace("\'\'", "\'")
+            temp2 = temp2.replace("\"\"", "\"")
             rec[5] = temp2
 
             prevImg['imageFormat'] = rec[1]
@@ -370,12 +369,12 @@ def sendPendingMessages(client_socket, receiverName):
         #######
         print(rec[3], rec[4], '-------------')
         # DON'T ENCRYPT SEND IMAGE , ADD_PARTICIPANT
-        if (rec[3] == "" or rec[4]=="ADD_PARTICIPANT"):
+        if (rec[3] == "" or rec[4] == "ADD_PARTICIPANT"):
             isGroup = False
 
-        if (rec[4] =="ADD_PARTICIPANT"):
+        if (rec[4] == "ADD_PARTICIPANT"):
             prevAdd = {'messageId': f"{rec[0]}", 'sender': f"{rec[1]}", 'receiver': f"{rec[2]}", 'fernetKey': f"{rec[5]}",
-                        'grpName': f"{rec[3]}", 'userMessage': f"{rec[4]}", 'isGroup': isGroup, 'isComplete': False}
+                       'grpName': f"{rec[3]}", 'userMessage': f"{rec[4]}", 'isGroup': isGroup, 'isComplete': False}
             isAdd = True
             continue
 
@@ -388,13 +387,13 @@ def sendPendingMessages(client_socket, receiverName):
 
         elif (not imgSent and not addSent):
             temp1 = rec[4]
-            temp1 = temp1.replace("\'\'","\'")
-            temp1 = temp1.replace("\"\"","\"")
+            temp1 = temp1.replace("\'\'", "\'")
+            temp1 = temp1.replace("\"\"", "\"")
             rec[4] = temp1
 
             temp2 = rec[5]
-            temp2 = temp2.replace("\'\'","\'")
-            temp2 = temp2.replace("\"\"","\"")
+            temp2 = temp2.replace("\'\'", "\'")
+            temp2 = temp2.replace("\"\"", "\"")
             rec[5] = temp2
 
             message = {'messageId': f"{rec[0]}", 'sender': f"{rec[1]}", 'receiver': f"{rec[2]}", 'fernetKey': f"{rec[5]}",
@@ -422,7 +421,8 @@ def sendPendingMessages(client_socket, receiverName):
     message = {'isComplete': True}
     jsonData = json.dumps(message)
     print("SENT")
-    client_socket.send(bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
+    client_socket.send(
+        bytes(f'{len(jsonData):<10}{jsonData}', encoding='utf-8'))
     print(f"All pending messages sent succesfully to {receiverName}")
 
     ####################################################
@@ -444,6 +444,7 @@ def updatestatus(isOnline, username):
     query = f'''UPDATE userinfo SET isOnline = {isOnline} WHERE username = '{username}';'''
     cur.execute(query)
 
+
 def replace_quote(msg, fernet):
     """Duplicate all occurences of both double and single quotes
 
@@ -454,11 +455,12 @@ def replace_quote(msg, fernet):
     :return: return the string with duplicated quotes
     :rtype: str,str
     """
-    msg = msg.replace("\'","\'\'")
-    msg = msg.replace("\"","\"\"")
-    fernet = fernet.replace("\'","\'\'")
-    fernet = fernet.replace("\"","\"\"")
-    return msg,fernet
+    msg = msg.replace("\'", "\'\'")
+    msg = msg.replace("\"", "\"\"")
+    fernet = fernet.replace("\'", "\'\'")
+    fernet = fernet.replace("\"", "\"\"")
+    return msg, fernet
+
 
 if __name__ == '__main__':
 
@@ -470,7 +472,7 @@ if __name__ == '__main__':
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.bind((IP, PORT))
-
+    print('Server socket initialized')
     server_socket.listen()
 
     sockets_list = [server_socket]
@@ -492,7 +494,7 @@ if __name__ == '__main__':
     # print("skdhks")
 
     initialize()
-
+    print('Initialized the server database')
     while True:
         # Of these three lists, returned by the selet method, 1st is the one which has all sockets whcih are ready to proceed.
         # 3rd is the one which throws some exception
@@ -570,10 +572,11 @@ if __name__ == '__main__':
                         nextRowNum = record[0][0] + 1
                         # print(nextRowNum)
                         if (message['userMessage'] == "SEND IMAGE"):
-
+                            print('Sending image')
                             fernet = message['fernetKey']
                             encrypted = message['imageData']
-                            encrypted, fernet = replace_quote(encrypted, fernet)
+                            encrypted, fernet = replace_quote(
+                                encrypted, fernet)
 
                             query = f'''INSERT INTO pending
                                             VALUES({nextRowNum}, '{message['sender']}', '{message['receiver']}', '', '{message['userMessage']}', '{fernet}');'''
@@ -584,11 +587,13 @@ if __name__ == '__main__':
                             cur.execute(query)
 
                         elif (message['userMessage'] == "ADD_PARTICIPANT"):
+                            print('Adding participant')
                             query = f'''INSERT INTO pending
                                             VALUES({nextRowNum}, '{message['sender']}', '{message['receiver']}', '{message['grpName']}', '{message['userMessage']}');'''
                             cur.execute(query)
 
-                            message['privateKey'] = [int(i) for i in message['privateKey']]
+                            message['privateKey'] = [
+                                int(i) for i in message['privateKey']]
 
                             query = f'''INSERT INTO pending
                                             VALUES({nextRowNum+1}, '{message['sender']}', '{message['receiver']}', '{message['grpName']}', '{message['privateKey']}');'''
@@ -596,6 +601,7 @@ if __name__ == '__main__':
 
                             # message['privateKey'] = [str(i) for i in message['privateKey']]
                         elif (message['userMessage'] == "REMOVE_PARTICIPANT"):
+                            print('Removing participant')
                             fernet = message['fernetKey']
                             encrypted = message['userMessage']
 
@@ -606,8 +612,8 @@ if __name__ == '__main__':
                         else:
                             fernet = message['fernetKey']
                             encrypted = message['userMessage']
-                            encrypted, fernet = replace_quote(encrypted, fernet)
-                           
+                            encrypted, fernet = replace_quote(
+                                encrypted, fernet)
 
                             query = f'''INSERT INTO pending
                                             VALUES({nextRowNum}, '{message['sender']}', '{message['receiver']}', '', '{encrypted}', '{fernet}');'''
@@ -624,10 +630,11 @@ if __name__ == '__main__':
                         message['messageId'] = nextRowNum
 
                         if (message['userMessage'] == "SEND IMAGE"):
-
+                            print('Sending image')
                             fernet = message['fernetKey']
                             encrypted = message['imageData']
-                            encrypted,fernet = replace_quote(encrypted,fernet)
+                            encrypted, fernet = replace_quote(
+                                encrypted, fernet)
 
                             query = f'''INSERT INTO pending
                                             VALUES({nextRowNum}, '{message['sender']}', '{message['receiver']}', '', '{message['userMessage']}', '{fernet}');'''
@@ -637,16 +644,19 @@ if __name__ == '__main__':
                             cur.execute(query)
 
                         elif (message['userMessage'] == "ADD_PARTICIPANT"):
+                            print('Adding participant')
                             query = f'''INSERT INTO pending
                                             VALUES({nextRowNum}, '{message['sender']}', '{message['receiver']}', '{message['grpName']}', '{message['userMessage']}');'''
                             cur.execute(query)
 
-                            message['privateKey'] = [int(i) for i in message['privateKey']]
+                            message['privateKey'] = [
+                                int(i) for i in message['privateKey']]
                             query = f'''INSERT INTO pending
                                             VALUES({nextRowNum+1}, '{message['sender']}', '{message['receiver']}', '{message['grpName']}', '{message['privateKey']}');'''
                             cur.execute(query)
                         # print(nextRowNum)
                         elif (message['userMessage'] == "REMOVE_PARTICIPANT"):
+                            print('Removing participant')
                             fernet = message['fernetKey']
                             encrypted = message['userMessage']
 
@@ -657,7 +667,8 @@ if __name__ == '__main__':
                         else:
                             fernet = message['fernetKey']
                             encrypted = message['userMessage']
-                            encrypted, fernet = replace_quote(encrypted,fernet)
+                            encrypted, fernet = replace_quote(
+                                encrypted, fernet)
 
                             query = f'''INSERT INTO pending
                                             VALUES({nextRowNum}, '{message['sender']}', '{message['receiver']}', '', '{encrypted}', '{fernet}');'''
@@ -687,10 +698,11 @@ if __name__ == '__main__':
                             message['messageId'] = nextRowNum
 
                             if (message['userMessage'] == "SEND IMAGE"):
-
+                                print('Sending image to group')
                                 fernet = message['fernetKey']
                                 encrypted = message['imageData']
-                                encrypted, fernet = replace_quote(encrypted, fernet)
+                                encrypted, fernet = replace_quote(
+                                    encrypted, fernet)
 
                                 query = f'''INSERT INTO pending
                                                 VALUES({nextRowNum}, '{message['sender']}', '{message['receiver']}', '{message['grpName']}', '{message['userMessage']}', '{fernet}');'''
@@ -703,7 +715,8 @@ if __name__ == '__main__':
                             else:
                                 fernet = message['fernetKey']
                                 encrypted = message['userMessage']
-                                encrypted, fernet = replace_quote(encrypted,fernet)
+                                encrypted, fernet = replace_quote(
+                                    encrypted, fernet)
 
                                 query = f'''INSERT INTO pending
                                                 VALUES({nextRowNum}, '{message['sender']}', '{message['receiver']}', '{message['grpName']}', '{encrypted}', '{fernet}');'''
@@ -726,10 +739,11 @@ if __name__ == '__main__':
                             # print(nextRowNum)
 
                             if (message['userMessage'] == "SEND IMAGE"):
-
+                                print('Sending group image to offline client')
                                 fernet = message['fernetKey']
                                 encrypted = message['imageData']
-                                encrypted, fernet = replace_quote(encrypted, fernet)    
+                                encrypted, fernet = replace_quote(
+                                    encrypted, fernet)
 
                                 query = f'''INSERT INTO pending
                                                 VALUES({nextRowNum}, '{message['sender']}', '{message['receiver']}', '{message['grpName']}', '{message['userMessage']}', '{fernet}');'''
@@ -739,9 +753,11 @@ if __name__ == '__main__':
                                 cur.execute(query)
 
                             else:
+                                print('Sending group msg to offline client')
                                 fernet = message['fernetKey']
                                 encrypted = message['userMessage']
-                                encrypted, fernet = replace_quote(encrypted,fernet)
+                                encrypted, fernet = replace_quote(
+                                    encrypted, fernet)
 
                                 query = f'''INSERT INTO pending
                                                 VALUES({nextRowNum}, '{message['sender']}', '{message['receiver']}', '{message['grpName']}', '{encrypted}', '{fernet}');'''

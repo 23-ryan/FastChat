@@ -1,6 +1,4 @@
 import sys
-import socket
-import select
 import random
 # from itertools import cycle
 import threading
@@ -19,8 +17,8 @@ import subprocess
 
 # ITER = cycle(SERVER_POOL)
 # def round_robin(iter):
-    # round_robin([A, B, C, D]) --> A B C D A B C D A B C D ...
-    # return next(iter)
+# round_robin([A, B, C, D]) --> A B C D A B C D A B C D ...
+# return next(iter)
 
 # class Server(object):
 #     def __init__(self, IP, PORT):
@@ -53,10 +51,13 @@ def assignPid():
     """
     for i in range(1, 4):
         # change localhost in below command to ip address
-        cmd = ''' ps aux | grep "server.py localhost ''' +f'''{(PORT + i*100)}'''+ '''" | head -1 | awk '{print $2}' '''
-        id = subprocess.check_output(cmd, shell=True, universal_newlines=True).strip()
+        cmd = ''' ps aux | grep "server.py localhost ''' + \
+            f'''{(PORT + i*100)}''' + '''" | head -1 | awk '{print $2}' '''
+        id = subprocess.check_output(
+            cmd, shell=True, universal_newlines=True).strip()
         pid_serverId[id] = i-1
         serverId_pid[i-1] = id
+
 
 def strategy(algorithm):
     """Return a server based on the load balancing algorithm requested
@@ -67,46 +68,48 @@ def strategy(algorithm):
     :rtype: int,int
     """
     global roundRobin
-    if(algorithm == 'round-robin'):
-        a, b  = roundRobin , (PORT + (roundRobin)*100)
-        roundRobin = (roundRobin+1)%3
-        print(a, b)
+    if (algorithm == 'round-robin'):
+        a, b = roundRobin, (PORT + (roundRobin)*100)
+        roundRobin = (roundRobin+1) % 3
+        print(algorithm + ' Chose server indexed at ' + str(a))
         return a, b
-    elif(algorithm == 'random'):
+    elif (algorithm == 'random'):
         a = random.randint(0, 2)
-        print(a, PORT + a*100)
+        print(algorithm + ' Chose server indexed at ' + str(a))
         return (a, PORT + a*100)
-    elif(algorithm == 'memory'):
+    elif (algorithm == 'memory'):
         mem = float('inf')
         a = -1
         for id in range(3):
-            cmd = ''' pmap ''' + f'''{(serverId_pid[id])}''' + ''' | tail -n 1 | awk '/[0-9]K/{print $2}' '''
-            kb = subprocess.check_output(cmd, shell=True, universal_newlines=True).strip()
-            currmem = int(kb.replace('K',''))
+            cmd = ''' pmap ''' + \
+                f'''{(serverId_pid[id])}''' + \
+                ''' | tail -n 1 | awk '/[0-9]K/{print $2}' '''
+            kb = subprocess.check_output(
+                cmd, shell=True, universal_newlines=True).strip()
+            currmem = int(kb.replace('K', ''))
             if (mem > currmem):
                 mem = currmem
                 a = id
-            print (id, currmem)
-        print(a, PORT + a*100)
-        print('')
+            # print (id, currmem)
+        print(algorithm + ' Chose server indexed at ' + str(a))
         return (a, PORT + a*100)
-    elif(algorithm == 'cpu'):
+    elif (algorithm == 'cpu'):
         cpu = float('inf')
         a = -1
         for id in range(3):
             # change localhost in below command to ip address
-            cmd = ''' ps aux | grep "server.py localhost ''' +f'''{(PORT + (id+1)*100)}'''+ '''" | head -1 | awk '{print $3}' '''
-            kb = subprocess.check_output(cmd, shell=True, universal_newlines=True).strip()
+            cmd = ''' ps aux | grep "server.py localhost ''' + \
+                f'''{(PORT + (id+1)*100)}''' + \
+                '''" | head -1 | awk '{print $3}' '''
+            kb = subprocess.check_output(
+                cmd, shell=True, universal_newlines=True).strip()
             currcpu = float(kb)
             if (cpu > currcpu):
                 cpu = currcpu
                 a = id
-            print (id, currcpu)
-        print(a, PORT + a*100)
-        print('')
+            # print (id, currcpu)
+        print(algorithm + ' Chose server indexed at ' + str(a))
         return (a, PORT + a*100)
-
-
 
 
 def getFreeServerId():
@@ -117,6 +120,7 @@ def getFreeServerId():
     """
     global r
     return strategy(algorithm)
+
 
 def runServer(IP, PORT):
     """Run a new server process
@@ -129,6 +133,7 @@ def runServer(IP, PORT):
     global r
     os.system(f'python3 server.py {IP} {PORT}')
 
+
 class LoadBalancer(object):
     """Socket implementation of a load balancer.
 
@@ -140,21 +145,39 @@ class LoadBalancer(object):
     """
 
     def __init__(self, ip, PORT, algorithm='random'):
+        """Constructor
+
+        :param [ip]: message string
+        :type [ip]: str
+        :param [PORT]: PORT of load balancer. Servers will have ports PORT+index*100
+        :type [PORT]: int
+        :param [algorithm]: algorithm to decide free-est server
+        :type [algorithm]: str
+        """
         self.ip = ip
         self.port = PORT
         self.algorithm = algorithm
         self.numservers = 3
-        
 
     def startServers(self):
+        """Start each server on a separate thread
+
+        """
         for i in range(1, self.numservers + 1):
-            serverTh = threading.Thread(target=runServer, args=(self.ip, (self.port + 10*i)))
+            serverTh = threading.Thread(
+                target=runServer, args=(self.ip, (self.port + 10*i)))
             serverTh.start()
             print("STARTED...")
-        
+
+
 class ServerThread(threading.Thread):
 
     def __init__(self, IP):
+        """Constructor
+
+        :param [IP]: IP on which to run the server
+        :type [IP]: str
+        """
         threading.Thread.__init__(self)
         self.server = SimpleThreadedXMLRPCServer.SimpleXMLRPCServer(
             (IP, 4000), logRequests=False, allow_none=True)
@@ -169,6 +192,8 @@ class ServerThread(threading.Thread):
         self.server.register_function(getFreeServerId)
 
     def run(self):
+        """Serve Forever
+        """
         self.server.serve_forever()
 
 
@@ -177,18 +202,20 @@ PORT = int(sys.argv[2])
 
 if __name__ == '__main__':
     try:
-        # NEW XMLRPC SERVER
         server = ServerThread(IP)
         server.start()
+        print('CREATED XMLRPC SERVER')
         initialize()
+        print('Initialized the postgreSQL database')
 
         loadBal = LoadBalancer(f'{IP}', PORT, 'memory')
         algorithm = loadBal.algorithm
         print(colored("Starting Load Balancer....", 'yellow'))
         assignPid()
-        print(pid_serverId)
+        print('PIDs of server processes:')
+        print(serverId_pid)
         # loadBal.startServers()
         time.sleep(1)
     except KeyboardInterrupt:
-        print ("Ctrl C - Stopping load_balancer")
+        print("Ctrl C - Stopping load_balancer")
         sys.exit(1)

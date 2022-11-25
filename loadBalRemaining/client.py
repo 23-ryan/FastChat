@@ -72,7 +72,6 @@ def handlePendingMessages(client_pending_socket, proxy):
                     key = data["fernetKey"]
                     encrypted, key = replace_quote(encrypted, key)
 
-                    print(grpName)
                     query = f'''INSERT INTO "{grpName}"
                                 VALUES ('{sender}','{message}', {nextRowNum}, '{key}');'''
                     cur.execute(query)
@@ -84,7 +83,6 @@ def handlePendingMessages(client_pending_socket, proxy):
                     # return (sender, grpName, decryptedMessage, data['messageId'], data['imageFormat'], data['imageData'])
 
                 elif message == "ADD_PARTICIPANT":
-                    print(grpName)
                     cur = connectMydb(MY_USERNAME)
                     query = f'''CREATE TABLE "{grpName}"(
                             name TEXT,
@@ -220,7 +218,7 @@ def receive_message(data, proxy):
     MY_USERNAME = data['receiver']
     message = data['userMessage']
 
-    logfile = open(f"received_logs.txt", "w")
+    logfile = open(f"received_logs.txt", "a")
     logfile.write(datetime.now().strftime("%H:%M:%S")+"\n")
     # When message in a group is received the sender would be the person swending it ,
     # while according to the implementation we need to enter in table of sender/grpName
@@ -429,12 +427,10 @@ def goOnline(username, IP, PORT):
     client_pending_sockets = []
 
     for i in range(1, 4):
-        print(i)
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client_socket.setblocking(True)
         # print(port, type(port))
         # print("HHHHHHHH")
-        print(PORT + 100*i)
         client_socket.connect((IP, PORT + 100*i))
 
         data = {'userHeader': f"{username_header}",

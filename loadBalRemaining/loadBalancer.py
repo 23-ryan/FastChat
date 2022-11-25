@@ -7,6 +7,7 @@ import time
 import random
 import os
 import subprocess
+import xmlrpc.server as SimpleThreadedXMLRPCServer
 
 NUM_SERVERS = int(sys.argv[3])
 RPC_PORT = int(sys.argv[4])
@@ -80,23 +81,24 @@ def strategy(algorithm):
     elif (algorithm == 'random'):
         a = random.randint(0, 2)
         print(algorithm + ' Chose server indexed at ' + str(a))
-        return (a, PORT + a*100)
+        return a, PORT + a*100
     elif (algorithm == 'memory'):
         mem = float('inf')
         a = -1
         for id in range(3):
-            cmd = ''' pmap ''' + \
-                f'''{(serverId_pid[id])}''' + \
-                ''' | tail -n 1 | awk '/[0-9]K/{print $2}' '''
+            cmd = ''' ps aux | grep "server.py localhost ''' + \
+                f'''{(PORT + (id+1)*100)}''' + \
+                '''" | head -1 | awk '{print $4}' '''
             kb = subprocess.check_output(
                 cmd, shell=True, universal_newlines=True).strip()
-            currmem = int(kb.replace('K', ''))
+            print(kb)
+            currmem = float(kb.replace('K', ''))
             if (mem > currmem):
                 mem = currmem
                 a = id
             # print (id, currmem)
         print(algorithm + ' Chose server indexed at ' + str(a))
-        return (a, PORT + a*100)
+        return a, PORT + a*100
     elif (algorithm == 'cpu'):
         cpu = float('inf')
         a = -1
@@ -113,7 +115,7 @@ def strategy(algorithm):
                 a = id
             # print (id, currcpu)
         print(algorithm + ' Chose server indexed at ' + str(a))
-        return (a, PORT + a*100)
+        return a, PORT + a*100
 
 
 def getFreeServerId():
@@ -122,7 +124,6 @@ def getFreeServerId():
     :return: index of the server and corresponding port
     :rtype: int,int
     """
-    global r
     return strategy(algorithm)
 
 

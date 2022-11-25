@@ -119,7 +119,7 @@ def handleDM(MY_USERNAME, OTHER_USERNAME, client_sockets, proxy, isGroup):
                 if (sockets != sys.stdin):
                     data = unpack_message(sockets)
                     data = receive_message(data, proxy)
-                    print(data[3], data[4])
+                    
                     sendAck(sockets, data[3], data[4])
 
                     if (data and data[1] == OTHER_USERNAME and data[2] == "REMOVE_PARTICIPANT"):
@@ -210,7 +210,7 @@ def handleDM(MY_USERNAME, OTHER_USERNAME, client_sockets, proxy, isGroup):
                     if (message == "BACK"):
                         return
 
-                    logfile = open(f"sent_logs.txt", "w")
+                    logfile = open(f"sent_logs.txt", "a")
                     logfile.write(datetime.now().strftime("%H:%M:%S")+"\n")
 
                     if message == "LEAVE GROUP":
@@ -289,7 +289,7 @@ def handleDM(MY_USERNAME, OTHER_USERNAME, client_sockets, proxy, isGroup):
                         encrypted_message = fernetObj.encrypt(
                             message.encode('utf-8'))
                         encrypted_key = rsa.encrypt(symmetricKey, publicKey)
-                        print(encrypted_key)
+                        
                         encrypt_for_me = rsa.encrypt(
                             symmetricKey, getOwnPublicKey(MY_USERNAME))
                         # INSERT data into the table

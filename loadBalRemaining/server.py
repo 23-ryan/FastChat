@@ -12,13 +12,26 @@ import select
 import json
 import sys
 
-from serverDatabase import connectToDb
 from json.decoder import JSONDecodeError
 
 import threading
-import threading
+import psycopg2
+from termcolor import colored
 
 HEADER_LENGTH = 10
+
+def connectToDb():
+    serverDbName = "fastchat"
+    """Connect to the appropriate PostgreSQL account and set autocommit to true.
+
+    :return: cursor to the server database
+    :rtype: _Cursor
+    """
+    conn = psycopg2.connect(database=f"{serverDbName}", user="postgres",
+                            password="fastchat", host=IP, port="5432")
+    conn.autocommit = True
+    cur = conn.cursor()
+    return cur
 
 
 def getPublicKey(username):
@@ -264,7 +277,7 @@ def initialize():
                             timestamp timestamp NOT NULL DEFAULT NOW());'''
                 cur.execute(query)
 
-            query = '''DROP FUNCTION IF EXISTS pending_delete_old_rows();'''
+            query = '''DROP FUNCTION IF EXISTS pending_delete_old_rows() CASCADE;'''
             cur.execute(query)
 
             query = '''CREATE FUNCTION pending_delete_old_rows() RETURNS trigger
@@ -460,11 +473,11 @@ def replace_quote(msg, fernet):
     fernet = fernet.replace("\"", "\"\"")
     return msg, fernet
 
+IP = sys.argv[1]
+PORT = int(sys.argv[2])
 
 if __name__ == '__main__':
 
-    IP = sys.argv[1]
-    PORT = int(sys.argv[2])
 
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

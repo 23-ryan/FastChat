@@ -8,6 +8,9 @@
 5. Group and Direct Messaging options for communicating images and text
 6. Create group, add user to a group, remove user from a group
 7. Storing unacknowledged messages on the server-side database, and delivering them when the client comes online again
+8. Deleting pending messages after a predetermined duration
+9. Server load balancing strategies: random, round-robin, memory-based, and CPU-based
+10. E2E encryption in both personal and group chats
 
 ### Technology used
 - Python
